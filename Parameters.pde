@@ -26,34 +26,47 @@ float getTargetSpeed(){ return SCALE*speed; }
 
 float getTargetFootHeight(){ return SCALE*10.0; }
 
-float getMovementPeriod(){ return 1.8; } // s
+float getMovementPeriod(){ return period; } // s
 
-float getMovementThreshold(){ return 0.9; }
+float getMovementThreshold(){ return 0.80; }
 
-float getPhaseLeg(int i){ return new float[]{0.2, 0.00, 0.7, 0.50}[i]; } // % of period
+float getPhaseLeg(int i){ return new float[]{0.30, 0.00, 0.80, 0.50}[i]; } // % of period
 
-float get_x(float phase){   // Returns x coordinate of foot wrt body shoulder (phase given as percentage of period)
+// Circular kinematics
+/*
+Trajectory getFootTrajectory(){
   float threshold = getMovementThreshold(); // Threshold at which the foot goes up
   float dx = threshold * getTargetSpeed() * getMovementPeriod();  // Movement of robot in one period: corresponds to full movement of foot
-  if(phase < threshold){
-    return dx/2 - dx * (phase/threshold); // The foot is going backward and slow wrt to the robot    
-  } else {
-    return -dx/2 * cos( PI * (phase - threshold) / (1.0 - threshold)); // The foot is going forward and fast wrt to the robot  
-  }
+  
+  Trajectory t = new Trajectory();
+  t.phases.add(0.0);
+  t.phases.add(threshold);
+  t.phases.add(1.0);
+  t.segments_x.add(new Lin(dx/2, -dx/2));
+  t.segments_x.add(new Cos(0.0, dx/2, PI, 0));
+  t.segments_y.add(new Constant(0.0));
+  t.segments_y.add(new Constant(0.0));
+  t.segments_z.add(new Constant(0.0));
+  t.segments_z.add(new Cos(0.0, dx/2, HALF_PI, -HALF_PI));
+  return t;
 }
+*/
 
-float get_y(float phase){    // Returns y coordinate of foot wrt body shoulder (phase given as percentage of period)
-  return 0.0;  
-}
-
-float get_z(float phase){    // Returns z coordinate of foot wrt body shoulder (phase given as percentage of period)
+// Composed kinematics
+Trajectory getFootTrajectory(){
   float threshold = getMovementThreshold(); // Threshold at which the foot goes up
+  float airborne = 1.0 - threshold;
   float dx = threshold * getTargetSpeed() * getMovementPeriod();  // Movement of robot in one period: corresponds to full movement of foot
-  if(phase < threshold){
-    return 0; // The foot is going backward and slow wrt to the robot    
-  } else {
-    return dx/2 * sin( PI * (phase - threshold) / (1.0 - threshold)); // The foot is going forward and fast wrt to the robot  
-  }
+  float h = getTargetFootHeight();
+  float t_arc = airborne * HALF_PI * h / (dx + (PI-1.0) * h);
+  
+  Trajectory t = new Trajectory();
+  t.addSegment(threshold,       new Lin(dx/2, -dx/2),                  new Constant(0.0), new Constant(0.0));
+  t.addSegment(threshold+t_arc, new Cos(-dx/2+h, -h, 0, -HALF_PI),     new Constant(0.0), new Cos(0.0, h, -HALF_PI, 0));
+  t.addSegment(1.0-t_arc,       new Lin(-dx/2+h, dx/2),                new Constant(0.0), new Constant(h));
+  t.addSegment(1.0,             new Cos(dx/2, h/2, HALF_PI, -HALF_PI), new Constant(0.0), new Cos(h/2, h/2, 0, PI));
+    
+  return t;
 }
 
 // Style

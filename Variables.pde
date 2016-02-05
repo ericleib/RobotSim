@@ -3,12 +3,16 @@
 
 // Robot longitudinal speed
 float speed = 20.0; // mm/s
+float period = 3.0; // s
 
-// Foot variables
+// Phase of each leg
 float[] phase = new float[4];
-float[] footx = new float[4];
-float[] footy = new float[4];
-float[] footz = new float[4];
+
+// Foot coordinates
+float[][] foot = new float[4][];
+
+// Knee coordinates
+float[][] knee = new float[4][];
 
 // Leg angles
 float[] theta = new float[4]; // Shoulder angle
