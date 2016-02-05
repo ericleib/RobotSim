@@ -1,24 +1,29 @@
 import controlP5.*;    // import controlP5 library
 import java.util.*;
-ControlP5 controlP5;   // controlP5 object
 
 // Simulation parameters
 float FPS = 50;
 float time = 0.0;
-
 boolean pause = false;
+
+ControlP5 cp5;   // controlP5 object
+Chart phiChart, psiChart, phidChart, psidChart;
 
 void setup() {
   frameRate(FPS);
-  size(640, 720);
+  size(1024, 720);
   smooth();
-  controlP5 = new ControlP5(this);
-  Controller speedSlider = controlP5.addSlider("speed",0.0,100.0,20.0,150,5,300,15);
+  cp5 = new ControlP5(this);
+  Controller speedSlider = cp5.addSlider("speed",0.0,100.0,20.0,150,5,300,15);
   speedSlider.getCaptionLabel().setColor(0);
-  Controller periodSlider = controlP5.addSlider("period",0.0,10,3.0,150,22,300,15);
+  Controller periodSlider = cp5.addSlider("period",0.0,10,3.0,150,22,300,15);
   periodSlider.getCaptionLabel().setColor(0);
-  controlP5.addButton("pause").setPosition(500,5).setSize(35,15);
-  controlP5.addButton("next").setPosition(538,5).setSize(35,15);
+  cp5.addButton("pause").setPosition(500,5).setSize(35,15);
+  cp5.addButton("next").setPosition(538,5).setSize(35,15);
+  phiChart = makeChart("phi", 0, 0, 180);
+  psiChart = makeChart("psi", 1, 0, 180);
+  phidChart = makeChart("phid", 2, -60, 60);
+  psidChart = makeChart("psid", 3, -60, 60);
 }
 
 
@@ -129,10 +134,21 @@ void draw() {
   
   // Compute angles
   for(int i=0; i<4; i++){
+    float theta_ = theta[i];
+    float phi_ = phi[i];
+    float psi_ = psi[i];
     theta[i] = 180.0/PI * atan((foot[i].y-shoulder[i].y) / h);
     phi[i] = 180.0/PI * PVector.angleBetween(new PVector(1,0,0), PVector.sub(knee[i], shoulder[i]));
     psi[i] = 180.0/PI * PVector.angleBetween(PVector.sub(knee[i], shoulder[i]), PVector.sub(foot[i], knee[i]));
+    thetad[i] = (theta[i] - theta_)*FPS;
+    phid[i] = (phi[i] - phi_)*FPS;
+    psid[i] = (psi[i] - psi_)*FPS;
   }
+  phiChart.push("phi", phi[0]);
+  psiChart.push("psi", psi[0]);
+  phidChart.push("phid", phid[0]);
+  psidChart.push("psid", psid[0]);
+  
   
   drawTime();
 }
@@ -191,8 +207,19 @@ boolean pointInTriangle(PVector[] points, PVector pt){
   return 0 <= s && s<= 1 && 0 <= t && t <= 1 && s + t <= 1;
 }
 
+Chart makeChart(String name, int n, float min, float max){
+  return cp5.addChart(name)
+               .setPosition(620, 5 + n * 170)
+               .setSize(400, 150)
+               .setRange(min, max)
+               .setView(Chart.LINE) // use Chart.LINE, Chart.PIE, Chart.AREA, Chart.BAR_CENTERED
+               .setStrokeWeight(1.5)
+               .setColorCaptionLabel(color(40))
+               .addDataSet(name)
+               ;
+}
 
-public void controlEvent(ControlEvent e) {
+void controlEvent(ControlEvent e) {
   if(e.getName()=="pause") pause = !pause;
   if(e.getName()=="next")
     if(!pause)

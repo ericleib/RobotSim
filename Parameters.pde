@@ -5,19 +5,19 @@ float SCALE = 3.0;  // pixels / mm
 
 float getFrameThickness(){  return SCALE*5.0; }
 
-float getFrameWidth(){  return SCALE*40; }
+float getFrameWidth(){  return SCALE*40.0; }
 
-float getFrameLength(){  return SCALE*100; }
+float getFrameLength(){  return SCALE*100.0; }
 
-float getFrameHeight(){ return getUpperLegLength() * 1.4; }
+float getFrameHeight(){ return getUpperLegLength() * 1.40; }
 
 float getUpperLegLength(){ return SCALE*50.0; }
 
 float getLowerLegLength(){ return SCALE*50.0; }
 
-float getFrameCGx(){ return getFrameLength() * 0.5; }
+float getFrameCGx(){ return getFrameLength() * 0.50; }
 
-float getFrameCGy(){ return getFrameWidth() * 0.5; }
+float getFrameCGy(){ return getFrameWidth() * 0.50; }
 
 
 // Kinematics
@@ -39,15 +39,8 @@ Trajectory getFootTrajectory(){
   float dx = threshold * getTargetSpeed() * getMovementPeriod();  // Movement of robot in one period: corresponds to full movement of foot
   
   Trajectory t = new Trajectory();
-  t.phases.add(0.0);
-  t.phases.add(threshold);
-  t.phases.add(1.0);
-  t.segments_x.add(new Lin(dx/2, -dx/2));
-  t.segments_x.add(new Cos(0.0, dx/2, PI, 0));
-  t.segments_y.add(new Constant(0.0));
-  t.segments_y.add(new Constant(0.0));
-  t.segments_z.add(new Constant(0.0));
-  t.segments_z.add(new Cos(0.0, dx/2, HALF_PI, -HALF_PI));
+  t.addSegment(threshold, new Lin(dx/2, -dx/2),      new Constant(0.0), new Constant(0.0));
+  t.addSegment(1.0,       new Cos(0.0, dx/2, PI, 0), new Constant(0.0), new Cos(0.0, dx/2, HALF_PI, -HALF_PI));
   return t;
 }
 */
