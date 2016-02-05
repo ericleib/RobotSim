@@ -17,7 +17,7 @@ class Trajectory {
     segments_z.add(z);
   }
   
-  float[] interpolate(float phase){
+  PVector interpolate(float phase){
     float p1 = phases.get(0), p2 = phases.get(1);
     int i=1;
     for(; i<phases.size(); i++){
@@ -27,11 +27,10 @@ class Trajectory {
       p1 = p2;
     }
     float ph = (phase - p1) / (p2 - p1);
-    return new float[]{
+    return new PVector(
       segments_x.get(i-1).interpolate(ph),
       segments_y.get(i-1).interpolate(ph),
-      segments_z.get(i-1).interpolate(ph)
-    };
+      segments_z.get(i-1).interpolate(ph));
   }
   
 }

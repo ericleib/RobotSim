@@ -8,11 +8,14 @@ float period = 3.0; // s
 // Phase of each leg
 float[] phase = new float[4];
 
+// Shoulder coordinates
+PVector[] shoulder = new PVector[4];
+
 // Foot coordinates
-float[][] foot = new float[4][];
+PVector[] foot = new PVector[4];
 
 // Knee coordinates
-float[][] knee = new float[4][];
+PVector[] knee = new PVector[4];
 
 // Leg angles
 float[] theta = new float[4]; // Shoulder angle

@@ -37,7 +37,11 @@ void draw() {
   float ground_x = offset_x - SCALE * 30.0;
   float ground_x2 = offset_x + l + SCALE * 30.0;
   float ground_y = offset_y_side + t * 0.5 + h;
-      
+  
+  shoulder[0] = new PVector(offset_x, offset_y, h);
+  shoulder[1] = new PVector(offset_x + l, offset_y, h);
+  shoulder[2] = new PVector(offset_x, offset_y + w, h);
+  shoulder[3] = new PVector(offset_x + l, offset_y + w, h);
   
   // Draw the frame
   setFrameColor();
@@ -61,11 +65,11 @@ void draw() {
   Trajectory traj = getFootTrajectory();
   float npoints = FPS * getMovementPeriod();
   for(int i=0; i<npoints; i++){
-    float[] pt = traj.interpolate(i/npoints);
-    drawFoot(offset_x + pt[0],     offset_y - pt[1],     pt[2], ground_y, 1, true);
-    drawFoot(offset_x + pt[0] + l, offset_y - pt[1],     pt[2], ground_y, 1, true);
-    drawFoot(offset_x + pt[0],     offset_y + w + pt[1], pt[2], ground_y, -1, true);
-    drawFoot(offset_x + pt[0] + l, offset_y + w + pt[1], pt[2], ground_y, -1, true);
+    PVector pt = traj.interpolate(i/npoints);
+    for(int j=0; j<4; j++){
+      if(j==2 || j==3) pt.y = -pt.y;
+      drawFoot(PVector.add(pt,shoulder[j]).add(0,0,-h), ground_y, true);
+    }
   }
     
     
@@ -74,30 +78,23 @@ void draw() {
   for(int i=0; i<4; i++){
     phase[i] = (ph + getPhaseLeg(i)) % 1.0;
     foot[i] = traj.interpolate(phase[i]);
-    foot[i][0] += offset_x;
-    if(i==1 || i==3) foot[i][0] += l;
-    if(i==0 || i==1){
-      foot[i][1] = offset_y - foot[i][1];
-      drawFoot(foot[i][0], foot[i][1], foot[i][2], ground_y, 1, false);
-    }else{
-      foot[i][1] = offset_y + w + foot[i][1];
-      drawFoot(foot[i][0], foot[i][1], foot[i][2], ground_y, -1, false);
-    }
+    if(i==2 || i==3) foot[i].y = -foot[i].y;
+    foot[i].add(shoulder[i]).add(0,0,-h);
+    drawFoot(foot[i], ground_y, false);
   }
   
   
   // Draw the triangles
-  float cgx = offset_x + getFrameCGx();
-  float cgy = offset_y + getFrameCGy();
-  List<float[][]> stable = new ArrayList(), unstable = new ArrayList();
+  PVector cg = new PVector(offset_x + getFrameCGx(), offset_y + getFrameCGy());
+  List<PVector[]> stable = new ArrayList(), unstable = new ArrayList();
   for(int i=0; i<4; i++){
-    float[][] points = new float[3][3];
+    PVector[] points = new PVector[3];
     for(int j=0; j<3; j++){
       int k = j<i? j : j+1;
       points[j] = foot[k];
     }
-    if(points[0][2]==0.0 && points[1][2]==0.0 && points[2][2]==0.0){
-      if(pointInTriangle(points, cgx, cgy))
+    if(points[0].z==0.0 && points[1].z==0.0 && points[2].z==0.0){
+      if(pointInTriangle(points, cg))
         stable.add(points);
       else
         unstable.add(points);
@@ -105,12 +102,12 @@ void draw() {
   }
   // draw unstable triangles (red)
   setRed();
-  for(float[][] points : unstable)
-    triangle(points[0][0], points[0][1], points[1][0], points[1][1], points[2][0], points[2][1]);
+  for(PVector[] points : unstable)
+    triangle(points[0].x, points[0].y, points[1].x, points[1].y, points[2].x, points[2].y);
   // draw stable triangles (green)
   setGreen();
-  for(float[][] points : stable)
-    triangle(points[0][0], points[0][1], points[1][0], points[1][1], points[2][0], points[2][1]);
+  for(PVector[] points : stable)
+    triangle(points[0].x, points[0].y, points[1].x, points[1].y, points[2].x, points[2].y);
   
   
   // Draw the CG
@@ -118,57 +115,52 @@ void draw() {
     setGreen();
   else
     setRed();
-  drawCG(cgx, cgy);  // top view
-  drawCG(cgx, offset_y_side + getFrameThickness() * 0.5);  // side view
+  drawCG(cg);  // top view
+  drawCG(new PVector(cg.x, offset_y_side + getFrameThickness() * 0.5));  // side view
 
 
   // Draw legs
   stroke(100);
-  drawLeg(foot[0], offset_x,   getFrameHeight(), ground_y);
-  drawLeg(foot[1], offset_x+l, getFrameHeight(), ground_y);
-  drawLeg(foot[2], offset_x,   getFrameHeight(), ground_y);
-  drawLeg(foot[3], offset_x+l, getFrameHeight(), ground_y);
+  for(int i=0; i<4; i++){
+    knee[i] = computeKnee(foot[i], shoulder[i]);
+    drawLeg(foot[i], knee[i], shoulder[i], ground_y);
+  }
   
+  
+  // Compute angles
+  for(int i=0; i<4; i++){
+    theta[i] = 180.0/PI * atan((foot[i].y-shoulder[i].y) / h);
+    phi[i] = 180.0/PI * PVector.angleBetween(new PVector(1,0,0), PVector.sub(knee[i], shoulder[i]));
+    psi[i] = 180.0/PI * PVector.angleBetween(PVector.sub(knee[i], shoulder[i]), PVector.sub(foot[i], knee[i]));
+  }
   
   drawTime();
 }
 
-void drawFoot(float x, float y, float z, float gndy, float side, boolean point){
-  if(z==0.0)
-    setGreen();
-  else
-    setRed();
+void drawFoot(PVector foot, float gndy, boolean point){
+  if(foot.z==0.0) setGreen(); else setRed();
   if(point){
-    point(x, y - side * z);
-    point(x, gndy - z);
+    point(foot.x, foot.y + foot.z);
+    point(foot.x, gndy - foot.z);
   }else{
-    ellipse(x, y - side * z, 6.0, 6.0);
-    ellipse(x, gndy - z, 6.0, 6.0);
+    ellipse(foot.x, foot.y + foot.z, 6.0, 6.0);
+    ellipse(foot.x, gndy - foot.z, 6.0, 6.0);
   }
 }
 
-void drawLeg(float[] pt, float x2, float z2, float offset_z){
-  float r1 = getLowerLegLength();
-  float r2 = getUpperLegLength();
-  float d = sqrt((pt[0]-x2)*(pt[0]-x2) + (z2-pt[2])*(z2-pt[2]));
-  float a = (r1*r1 - r2*r2 + d*d) / (2 * d);
-  float h = sqrt(r1*r1 - a*a);
-  float x3 = pt[0] + a * (x2 - pt[0]) / d;
-  float z3 = pt[2] + a * (z2 - pt[2]) / d;
-  float x4 = x3 - h * (z2 - pt[2]) / d;
-  float z4 = z3 + h * (x2 - pt[0]) / d;
-  ellipse(x4, offset_z-z4, 6.0, 6.0);
-  ellipse(x2, offset_z-z2, 6.0, 6.0);
-  line(pt[0], offset_z-pt[2], x4, offset_z-z4);
-  line(x4, offset_z-z4, x2, offset_z-z2);
+void drawLeg(PVector foot, PVector knee, PVector shoulder, float offset_z){
+  ellipse(knee.x, offset_z-knee.z, 6.0, 6.0);
+  ellipse(shoulder.x, offset_z-shoulder.z, 6.0, 6.0);
+  line(foot.x, offset_z-foot.z, knee.x, offset_z-knee.z);
+  line(knee.x, offset_z-knee.z, shoulder.x, offset_z-shoulder.z);
 }
 
-void drawCG(float x, float y){
+void drawCG(PVector cg){
   strokeWeight(1);
-  ellipse(x, y, 10, 10);
+  ellipse(cg.x, cg.y, 10, 10);
   fill(g.strokeColor);
-  arc(x, y, 10, 10, 0, HALF_PI);
-  arc(x, y, 10, 10, PI, PI + HALF_PI);   
+  arc(cg.x, cg.y, 10, 10, 0, HALF_PI);
+  arc(cg.x, cg.y, 10, 10, PI, PI + HALF_PI);   
   noFill();
   strokeWeight(3);
 }
@@ -181,10 +173,21 @@ void drawTime(){
 }
 
 
-boolean pointInTriangle(float[][] points, float x, float y){
-  float area = 0.5*(-points[1][1]*points[2][0] + points[0][1]*(-points[1][0] + points[2][0]) + points[0][0]*(points[1][1] - points[2][1]) + points[1][0]*points[2][1]);
-  float s = 1/(2*area)*(points[0][1]*points[2][0] - points[0][0]*points[2][1] + (points[2][1] - points[0][1])*x + (points[0][0] - points[2][0])*y);
-  float t = 1/(2*area)*(points[0][0]*points[1][1] - points[0][1]*points[1][0] + (points[0][1] - points[1][1])*x + (points[1][0] - points[0][0])*y);
+PVector computeKnee(PVector foot, PVector shoulder){
+  float r1 = getLowerLegLength();
+  float r2 = getUpperLegLength();
+  float d = foot.dist(shoulder);
+  float a = (r1*r1 - r2*r2 + d*d) / (2 * d);
+  float h = sqrt(r1*r1 - a*a);
+  PVector pt = PVector.add(foot, PVector.sub(shoulder,foot).mult(a/d));
+  PVector knee = pt.add(PVector.sub(shoulder,foot).cross(new PVector(0,1,0)).mult(h/d));
+  return knee;
+}
+
+boolean pointInTriangle(PVector[] points, PVector pt){
+  float area = 0.5*(-points[1].y*points[2].x + points[0].y*(-points[1].x + points[2].x) + points[0].x*(points[1].y - points[2].y) + points[1].x*points[2].y);
+  float s = 1/(2*area)*(points[0].y*points[2].x - points[0].x*points[2].y + (points[2].y - points[0].y)*pt.x + (points[0].x - points[2].x)*pt.y);
+  float t = 1/(2*area)*(points[0].x*points[1].y - points[0].y*points[1].x + (points[0].y - points[1].y)*pt.x + (points[1].x - points[0].x)*pt.y);
   return 0 <= s && s<= 1 && 0 <= t && t <= 1 && s + t <= 1;
 }
 
