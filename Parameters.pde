@@ -1,4 +1,3 @@
-
 float SCALE = 3.0;  // pixels / mm
 
 // Geometry (dimensions in mm)
@@ -15,6 +14,8 @@ float getUpperLegLength(){ return SCALE*50.0; }
 
 float getLowerLegLength(){ return SCALE*50.0; }
 
+float getShoulderWidth(){ return SCALE*10.0; }
+
 float getFrameCGx(){ return getFrameLength() * 0.50; }
 
 float getFrameCGy(){ return getFrameWidth() * 0.50; }
@@ -22,43 +23,34 @@ float getFrameCGy(){ return getFrameWidth() * 0.50; }
 
 // Kinematics
 
-float getTargetSpeed(){ return SCALE*speed; }
+float getSpeed(){ return SCALE*speed; }
 
-float getTargetFootHeight(){ return SCALE*10.0; }
+float getFootHeight(){ return SCALE*10.0; }
+
+float getFootDy(){ return -SCALE*15.0; }
+
+float getFootDr(){ return 0.0 * PI / 180; }
 
 float getMovementPeriod(){ return period; } // s
 
-float getMovementThreshold(){ return 0.80; }
+float getGroundRatio(){ return 0.80; }
 
-float getPhaseLeg(int i){ return new float[]{0.30, 0.00, 0.80, 0.50}[i]; } // % of period
+float getPhaseLeg(int i){ return new float[]{0.25, 0.00, 0.75, 0.50}[i]; } // % of period
 
-// Circular kinematics
-/*
+// kinematics
 Trajectory getFootTrajectory(){
-  float threshold = getMovementThreshold(); // Threshold at which the foot goes up
-  float dx = threshold * getTargetSpeed() * getMovementPeriod();  // Movement of robot in one period: corresponds to full movement of foot
+  float k = getGroundRatio(); // Threshold at which the foot goes up
+  float dx = 0.5 * k * getSpeed() * getMovementPeriod();  // Half longitudinal movement
+  float h = getFootHeight();
+  float dy = getFootDy();
+  float dr = getFootDr();
   
   Trajectory t = new Trajectory();
-  t.addSegment(threshold, new Lin(dx/2, -dx/2),      new Constant(0.0), new Constant(0.0));
-  t.addSegment(1.0,       new Cos(0.0, dx/2, PI, 0), new Constant(0.0), new Cos(0.0, dx/2, HALF_PI, -HALF_PI));
-  return t;
-}
-*/
-
-// Composed kinematics
-Trajectory getFootTrajectory(){
-  float threshold = getMovementThreshold(); // Threshold at which the foot goes up
-  float airborne = 1.0 - threshold;
-  float dx = threshold * getTargetSpeed() * getMovementPeriod();  // Movement of robot in one period: corresponds to full movement of foot
-  float h = getTargetFootHeight();
-  float t_arc = airborne * HALF_PI * h / (dx + (PI-1.0) * h);
-  
-  Trajectory t = new Trajectory();
-  t.addSegment(threshold,       new Lin(dx/2, -dx/2),                  new Constant(0.0), new Constant(0.0));
-  t.addSegment(threshold+t_arc, new Cos(-dx/2+h, -h, 0, -HALF_PI),     new Constant(0.0), new Cos(0.0, h, -HALF_PI, 0));
-  t.addSegment(1.0-t_arc,       new Lin(-dx/2+h, dx/2),                new Constant(0.0), new Constant(h));
-  t.addSegment(1.0,             new Cos(dx/2, h/2, HALF_PI, -HALF_PI), new Constant(0.0), new Cos(h/2, h/2, 0, PI));
-    
+  t.addSegment(new PVector(dx, dy + dx * tan(dr), 0.0), new PVector(0.0, dy, 0.0), new PVector(0.0, dy, 0.0), new PVector(-dx, dy - dx * tan(dr), 0.0));
+  t.addSegment(new PVector(-dx, dy - dx * tan(dr), 0.0), new PVector(-dx, dy - dx * tan(dr), h), new PVector(-h, dy -h * tan(dr), h), new PVector(0, dy, h));
+  t.addSegment(new PVector(0, dy, h), new PVector(h, dy + h * tan(dr), h), new PVector(h, dy + h * tan(dr), h), new PVector(dx, dy + dx * tan(dr), h));
+  t.addSegment(new PVector(dx, dy + dx * tan(dr), h), new PVector(dx+h, dy + (dx+h) * tan(dr), h), new PVector(dx+h, dy + (dx+h) * tan(dr), 0), new PVector(dx, dy + dx * tan(dr), 0));
+  t.setGroundRatio(getGroundRatio());
   return t;
 }
 
