@@ -216,7 +216,7 @@ void computeAngles(int i){
   psi[i] = 180.0/PI * PVector.angleBetween(knee[i].copy().sub(shoulder[i]), foot[i].copy().sub(knee[i]));
   thetad[i] = (theta[i] - theta_)*FPS;
   phid[i] = (phi[i] - phi_)*FPS;
-  psid[i] = (psi[i] - psi_)*FPS; 
+  psid[i] = (psi[i] - psi_)*FPS;
 }
 
 // Checks if a point is inside a triangle
