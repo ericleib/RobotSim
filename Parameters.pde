@@ -27,11 +27,13 @@ float getSpeed(){ return SCALE*speed; }
 
 float getFootHeight(){ return SCALE*10.0; }
 
+float getFootDx(){ return SCALE*dx; } // Half longitudinal movement
+
 float getFootDy(){ return -SCALE*15.0; }
 
 float getFootDr(){ return 0.0 * PI / 180; }
 
-float getMovementPeriod(){ return period; } // s
+float getMovementPeriod(){ return getFootDx() / (0.5 * getGroundRatio() * getSpeed()); } // Period of the movement
 
 float getGroundRatio(){ return 0.80; }
 
@@ -39,8 +41,7 @@ float getPhaseLeg(int i){ return new float[]{0.25, 0.00, 0.75, 0.50}[i]; } // % 
 
 // kinematics
 Trajectory getFootTrajectory(){
-  float k = getGroundRatio(); // Threshold at which the foot goes up
-  float dx = 0.5 * k * getSpeed() * getMovementPeriod();  // Half longitudinal movement
+  float dx = getFootDx();
   float h = getFootHeight();
   float dy = getFootDy();
   float dr = getFootDr();

@@ -50,8 +50,8 @@ void drawArduino(){
     //arduino.analogWrite(CONTACT, constrain(arduino.analogRead(2)*180/1024, 70, 120));
     //arduino.analogWrite(PENDULUM, constrain(arduino.analogRead(3)*180/1024, 70, 120));
     
-    int Ptheta = (int) interp(-90, -135, 102.3, 48.7, theta[0]);
-    int Pphi = (int) interp(90, 135, 69.1, 121.8, phi[0]);
+    int Ptheta = (int) interp(0, -45, 102.3, 48.7, theta[0]);
+    int Pphi = (int) interp(90, 45, 69.1, 121.8, phi[0]);
     int Ppsi = (int) interp(90, 135, 102, 142.4, psi[0]);
     
     //arduino.servoWrite(CONTACT, constrain(arduino.analogRead(1)*180/1024, 0, 180));

@@ -6,7 +6,8 @@ boolean pause = false;  // Whether the simulation is paused or not
 
 // Robot longitudinal speed
 float speed = 20.0; // mm/s
-float period = 3.0; // s
+float dx = 20.0; //mm
+//float period = 3.0; // s
 
 // Phase of each leg
 float[] phase = new float[4];

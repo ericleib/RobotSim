@@ -1,3 +1,4 @@
+import java.util.*;
 
 class Trajectory {
  
@@ -22,7 +23,7 @@ class Trajectory {
     length = length_grd + length_air;
   }
   
-  PVector interpolate(float phase){
+  PVector point(float phase){
     float p = 0.0;
     for( Bezier b : beziers ){
       p += b.phase;

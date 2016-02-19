@@ -1,4 +1,3 @@
-import java.util.*;
 
 void setup() {
   frameRate(FPS);
@@ -14,18 +13,21 @@ void draw() {
   strokeWeight(3);
   noFill();
   
+  // Geometrical parameters of the robot
   float w = getFrameWidth();
   float l = getFrameLength();
   float t = getFrameThickness();
   float h = getFrameHeight();
   
+  // Where to draw the different views
   float offset_x = 150, offset_y = 150;
   float offset_y_side = offset_y * 2 + w;
   float offset_x_front = offset_x + l + SCALE * 80.0;
   float ground_x = offset_x - SCALE * 30.0;
   float ground_x2 = offset_x + l + SCALE * 30.0;
   float ground_y = offset_y_side + t * 0.5 + h;
-  
+    
+  // Coordinates of the slots of each leg
   slot[0] = new PVector(offset_x, offset_y, h);
   slot[1] = new PVector(offset_x + l, offset_y, h);
   slot[2] = new PVector(offset_x, offset_y + w, h);
@@ -56,7 +58,7 @@ void draw() {
   Trajectory traj = getFootTrajectory();
   float npoints = FPS * getMovementPeriod();
   for(int i=0; i<npoints; i++){
-    PVector pt = traj.interpolate(i/npoints);
+    PVector pt = traj.point(i/npoints);
     for(int j=0; j<4; j++){
       if(j==2) pt.y = -pt.y;
       drawFoot(pt.copy().add(slot[j]).add(0,0,-h), offset_x_front-offset_x, ground_y, true);
@@ -68,7 +70,7 @@ void draw() {
   float ph = (time % getMovementPeriod()) / getMovementPeriod();
   for(int i=0; i<4; i++){
     phase[i] = (ph + getPhaseLeg(i)) % 1.0;
-    foot[i] = traj.interpolate(phase[i]);
+    foot[i] = traj.point(phase[i]);
     if(i==2 || i==3) foot[i].y = -foot[i].y;
     foot[i].add(slot[i]).add(0,0,-h);
     drawFoot(foot[i], offset_x_front-offset_x, ground_y, false);
@@ -131,6 +133,9 @@ void draw() {
   drawTime();
 }
 
+
+// Drawing functions
+
 void drawFoot(PVector foot, float offset_x, float gndy, boolean point){
   if(foot.z==0.0) setGreen(); else setRed();
   if(point){
@@ -187,6 +192,9 @@ void drawTime(){
     time += 1.0 / FPS; 
 }
 
+
+// Calculation functions
+
 void computeShoulder(int i){
   PVector slot_foot = foot[i].copy().sub(slot[i]);  // Vector from slot to foot
   slot_foot.x = 0.0;                                // Project on plan (y,z)
@@ -211,9 +219,9 @@ void computeAngles(int i){
   float theta_ = theta[i];
   float phi_ = phi[i];
   float psi_ = psi[i];
-  theta[i] = 180.0/PI * atan((shoulder[i].y-slot[i].y) / (shoulder[i].z-slot[i].z));
-  phi[i] = 180.0/PI * PVector.angleBetween(new PVector(1,0,0), knee[i].copy().sub(shoulder[i]));
-  psi[i] = 180.0/PI * PVector.angleBetween(knee[i].copy().sub(shoulder[i]), foot[i].copy().sub(knee[i]));
+  theta[i] = degrees( atan((shoulder[i].z-slot[i].z) / (shoulder[i].y-slot[i].y) ));
+  phi[i] = degrees( PVector.angleBetween(new PVector(-1,0,0), knee[i].copy().sub(shoulder[i])));
+  psi[i] = degrees( PVector.angleBetween(knee[i].copy().sub(shoulder[i]), foot[i].copy().sub(knee[i])));
   thetad[i] = (theta[i] - theta_)*FPS;
   phid[i] = (phi[i] - phi_)*FPS;
   psid[i] = (psi[i] - psi_)*FPS;

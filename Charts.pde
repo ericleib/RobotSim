@@ -7,13 +7,13 @@ void setupCharts(){
   cp5 = new ControlP5(this);
   Controller speedSlider = cp5.addSlider("speed",0.0,100.0,20.0,150,5,300,15);
   speedSlider.getCaptionLabel().setColor(0);
-  Controller periodSlider = cp5.addSlider("period",0.0,10,3.0,150,22,300,15);
+  Controller periodSlider = cp5.addSlider("dx",0.0,50.0,20.0,150,22,300,15);
   periodSlider.getCaptionLabel().setColor(0);
   cp5.addButton("pause").setPosition(500,5).setSize(35,15);
   cp5.addButton("next").setPosition(538,5).setSize(35,15);
   phiChart = makeChart("phi", 0, 0, 180);
   psiChart = makeChart("psi", 1, 0, 180);
-  thetaChart = makeChart("theta", 2, -180, 0);
+  thetaChart = makeChart("theta", 2, -90, 90);
   //phidChart = makeChart("phid", 2, -60, 60);
   //psidChart = makeChart("psid", 3, -60, 60);
   
@@ -28,6 +28,10 @@ void setupCharts(){
 }
 
 void updateCharts(){
+  println(theta[0]+" "+phi[0]+" "+psi[0]);
+  //println(theta[1]+" "+phi[1]+" "+psi[1]);
+  println(theta[2]+" "+phi[2]+" "+psi[2]);
+  //println(theta[3]+" "+phi[3]+" "+psi[3]);
   phiChart.push("phi", phi[0]);
   psiChart.push("psi", psi[0]);
   thetaChart.push("theta", theta[0]);
