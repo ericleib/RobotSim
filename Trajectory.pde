@@ -35,7 +35,7 @@ class Trajectory {
       if(phase <= p)
         return s.pointLin(1-(p-phase)/ s.phase);
     }
-    return null;
+    return new PVector(0,0,0);
   }
   
   String toString(){

@@ -1,5 +1,8 @@
 class Ground extends Drawable {
     
+  float angle = HALF_PI*0.5;  // Angle of the grid
+  PVector grid_point = new PVector(0.0, 0.0, 0.0);  // Point of the grid
+  
   void draw(View v){
     
     float pitch = 20, margin = SCALE * 20.0;
@@ -7,20 +10,13 @@ class Ground extends Drawable {
     
     if(v==TOP){
       
-      float a=0.0, x0=frame.getLength()*0.5, y0=frame.getWidth()*0.5;
       float rotation = move.getRotation(phase);
-      PVector speed = move.getSpeed(phase);
-      if(rotation==0){
-        x0 += (-speed.x * time) % pitch;
-        y0 += (-speed.y * time) % pitch;
-      }else{
-        a = -HALF_PI*0.5 + ((time * rotation) % HALF_PI);
-        x0 += speed.y / rotation;
-        y0 += speed.x / rotation;
-      }
+      PVector speed = move.getSpeed(phase, grid_point);
+      angle = (angle + rotation * dt) % HALF_PI;
+      grid_point.add(-speed.x * dt, -speed.y * dt);
       
       v.strokeWeight(1);
-      v.grid(x0, y0, a, pitch);
+      v.grid(grid_point.x, grid_point.y, -HALF_PI*0.5 + angle, pitch);
       v.strokeWeight(3);
       
     }else if(v==SIDE || v==FRONT){

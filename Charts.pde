@@ -28,17 +28,19 @@ void setupCharts(){
 }
 
 void createSliders(){
-  for(Controller c:sliders)
-    cp5.remove(c.getName());
-  sliders.clear();
-  int i=0, j=0;
-  for(Parameter p:move.parameters.values()){
-    Controller c = cp5.addSlider(p.name, p.min, p.max, p.value, 170+j*350, 5+(i++)*17, 280, 15);
-    c.getValueLabel().getStyle().margin(0,0,0,3);
-    c.getCaptionLabel().getStyle().margin(0,0,0,3);
-    sliders.add(c);
-    c.getCaptionLabel().setColor(0);
-    if(i==6){ j++; i=0;}
+  if(cp5!=null){
+    for(Controller c:sliders)
+      cp5.remove(c.getName());
+    sliders.clear();
+    int i=0, j=0;
+    for(Parameter p:move.parameters.values()){
+      Controller c = cp5.addSlider(p.name, p.min, p.max, p.value, 170+j*350, 5+(i++)*17, 280, 15);
+      c.getValueLabel().getStyle().margin(0,0,0,3);
+      c.getCaptionLabel().getStyle().margin(0,0,0,3);
+      sliders.add(c);
+      c.getCaptionLabel().setColor(0);
+      if(i==6){ j++; i=0;}
+    }
   }
 }
 

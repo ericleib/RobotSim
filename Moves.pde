@@ -13,16 +13,24 @@ abstract class Move {
   
   abstract PVector getFootPosition(int i, float phase);
   
-  void update(){
-    trajectories = getFeetTrajectories();
+  void update(boolean quick){
+    if(!quick)
+      trajectories = getFeetTrajectories();
   }
   
-  private PVector[][] getFeetTrajectories(){
+  void update(){
+    update(false);
+  }
+  
+  protected PVector[][] getFeetTrajectories(){
     int npoints = min((int) (FPS * getPeriod()), 200);
     PVector[][] pts = new PVector[4][npoints];
-    for(int i=0; i<4; i++)
+    //println("get trajectories: "+getPeriod()+" "+npoints);
+    for(int i=0; i<4; i++){
+      //println("leg: "+i);
       for(int j=0; j<npoints; j++)
         pts[i][j] = getFootPosition(i, ((float)j)/npoints);
+    }
     return pts;
   }
   
@@ -34,6 +42,10 @@ abstract class Move {
     t.addSegment(new PVector(dx, dy + dx * tan(dr), h), new PVector(dx+h, dy + (dx+h) * tan(dr), h), new PVector(dx+h, dy + (dx+h) * tan(dr), 0), new PVector(dx, dy + dx * tan(dr), 0));
     t.setGroundRatio(k);
     return t;
+  }
+  
+  PVector getSpeed(float phase, PVector point){
+    return getSpeed(phase).add(frame.getCG().sub(point).cross(new PVector(0,0,getRotation(phase))));  // Speed of the point = Speed(CG) + point->cg ^ Rotation
   }
   
   void set(String name, float value){
@@ -56,6 +68,8 @@ abstract class Steady extends Move {
   
   abstract float getRotation();
   
+  PVector getSpeed(PVector point){ return getSpeed().add(frame.getCG().sub(point).cross(new PVector(0,0,getRotation()))); }  // Speed of the point = Speed(CG) + point->cg ^ Rotation
+  
   PVector getSpeed(float phase){ return getSpeed();}
   
   float getRotation(float phase){ return getRotation();}
@@ -63,7 +77,24 @@ abstract class Steady extends Move {
 }
 
 abstract class Transient extends Move {
-    
+  
+  Steady move1, move2;
+  float phase1, phase2;
+  float t1, t2;
+  
+  Transient(Steady move1, Steady move2, float phase1, float phase2){
+    this.move1 = move1;
+    this.move2 = move2;
+    this.phase1 = phase1;
+    this.phase2 = phase2;
+    t1 = move1.getPeriod();
+    t2 = move2.getPeriod();
+  }
+  
+  Transient(Steady move1, Steady move2){
+    this(move1, move2, 1.0, 0.0);
+  }
+  
 }
 
 class Walk extends Steady {
@@ -72,60 +103,39 @@ class Walk extends Steady {
     
   Walk(){ this(0.0, 0.0); }
   
-  Walk(float turn_radius){ this(turn_radius, 0.0); }
+  Walk(float rotation){ this(rotation, 0.0); }
   
-  Walk(float turn_radius, float dr){ this("WALK", turn_radius, dr); }
-  
-  Walk(String name, float turn_radius){ this(name, turn_radius, 0); }
-  
-  Walk(String name, float turn_radius, float dr){
+  Walk(float rotation, float dr){
     put(new Parameter("speed", 20.0, 0.0, 100.0));
     put(new Parameter("dx", 20.0, 0.0, 50.0));
     put(new Parameter("dy", 15.0, 0.0, 50.0));
     put(new Parameter("dz", 10.0, 0.0, 50.0));
     put(new Parameter("dr", dr, 0.0, 60.0));
     put(new Parameter("k_ground", 0.8, 0.0, 1.0));
-    put(new Parameter("radius", turn_radius, 0, 1000));
+    put(new Parameter("rotation", rotation, 0.0, 10.0));
     put(new Parameter("phase1", 0.25, 0, 1.0));
     put(new Parameter("phase2", 0.00, 0, 1.0));
     put(new Parameter("phase3", 0.75, 0, 1.0));
     put(new Parameter("phase4", 0.50, 0, 1.0));
-    this.name = name;
     update();
   }
   
-  void update(){
-    float dx = SCALE*get("dx");
+  void update(boolean quick){
+    name = getRotation()==0.0 ? (get("dr")==0? "Straight " : "Crab ")+"Walk" : "Turn "+nf(degrees(getRotation()),1,2)+"°/s";
     float dy = SCALE*get("dy");
-    float dz = SCALE*get("dz");
-    float dr = radians(get("dr"));
     float k = get("k_ground");
-    float radius = SCALE*get("radius");
-    if(radius==0.0){
-      t[0] = makeStepTrajectory(dx, -dy, dr, dz, k);  // Left forward
-      t[1] = makeStepTrajectory(dx, -dy, dr, dz, k);  // Left back
-      t[2] = makeStepTrajectory(dx,  dy, dr, dz, k);  // Right forward
-      t[3] = makeStepTrajectory(dx,  dy, dr, dz, k);  // Right back
-    }else{
-      float r1 = sqrt(pow(radius-dy,2) + pow(frame.getLength(),2)/4);
-      float r2 = sqrt(pow(radius+frame.getWidth()+dy,2) + pow(frame.getLength(),2)/4);
-      float omega = getRotation();
-      float dr1 = atan(frame.getLength()*0.5/(radius-dy));
-      float dr2 = atan(frame.getLength()*0.5/(radius+frame.getWidth()+dy));
-      float v1 = r1 * omega;
-      float v2 = r2 * omega;
-      float dx1 = k * getPeriod() * v1 * 0.5 * cos(dr1);
-      float dx2 = k * getPeriod() * v2 * 0.5 * cos(dr2);
-      t[0] = makeStepTrajectory(dx2, -dy, -dr2, dz, k);  // Left forward
-      t[1] = makeStepTrajectory(dx2, -dy,  dr2, dz, k);  // Left back
-      t[2] = makeStepTrajectory(dx1,  dy, -dr1, dz, k);  // Right forward
-      t[3] = makeStepTrajectory(dx1,  dy,  dr1, dz, k);  // Right back
+    for(int i=0; i<4; i++){      // for each leg
+      PVector v = getSpeed(legs[i].slot.copy().add(0, legs[i].right? dy : -dy, 0));  // Local speed of the leg
+      float dx = SCALE*get("dx") * (getRotation()==0.0 ? 1.0 : v.x / getSpeed().x);
+      float dr = getRotation()==0.0 ? radians(get("dr")) : atan(v.y/v.x); // warning: some cases where rotation!=0 and v.x = 0
+      //println(dx+" "+dy+" "+degrees(dr)+" "+get("dz")+" "+k);
+      t[i] = makeStepTrajectory(dx, legs[i].right? dy : -dy, dr, SCALE*get("dz"), k);  // Left forward //<>//
     }
-    super.update();
+    super.update(quick);
   }
   
   float getPeriod(){  // Period of the movement
-    return (SCALE*get("dx") / cos(radians(get("dr")))) / (0.5 * get("k_ground") * getSpeed().mag());
+    return SCALE*get("dx") / (0.5 * get("k_ground") * getSpeed().x);
   }
   
   PVector getFootPosition(int i, float phase){
@@ -135,25 +145,144 @@ class Walk extends Steady {
   
   PVector getSpeed(){ return new PVector(SCALE*get("speed"), SCALE*get("speed")*tan(radians(get("dr"))), 0.0); }
   
-  float getRotation(){ return get("radius")==0.0? 0.0 : getSpeed().x / (SCALE*get("radius")+0.5*frame.getWidth()); }
+  float getRotation(){ return radians(get("rotation")); }
 }
 
 
 class Stand extends Steady {
     
   Stand(){
-    this.name = "STAND"; 
+    put(new Parameter("dy", 15.0, 0.0, 50.0));
+    this.name = "Standing"; 
   }
   
   float getPeriod(){ return 1.0; }
   
-  PVector getFootPosition(int i, float phase){ return legs[i].slot.add(0,0,-frame.getHeight()); }
+  PVector getFootPosition(int i, float phase){ return legs[i].slot.add(0, (legs[i].right? 1.0 : -1.0) * SCALE*get("dy"), -frame.getHeight()); }
   
   PVector getSpeed(){ return new PVector(0.0, 0.0, 0.0); }
   
   float getRotation(){ return 0.0; }
   
 }
+
+class LinearTransient extends Transient {
+  
+  
+  int npoints;
+  float dp;
+  PVector[][][] alltrajectories;
+  
+  Move move;
+  float phase; // Only used to avoid redundant executions
+  
+  LinearTransient(Steady move1, Steady move2, float phase1, float phase2, float duration){
+    super(move1, move2, phase1, phase2);
+    put(new Parameter("duration", duration, 1.0, 20.0));
+    println("Transient: "+phase1+" "+phase2);
+    this.name = "Transient";
+    if(move1.getClass() != move2.getClass())
+      println("The two moves should be of the same class!");
+    try{
+      move = move1.getClass().getDeclaredConstructor(Robot.this.getClass()).newInstance(Robot.this);
+    }catch(Exception e){
+      e.printStackTrace();
+      println(move1.getClass().toString()+" must have a default constructor!");
+    }
+    npoints = (int) (getPeriod() * FPS);
+    dp = 1.0 / npoints;
+    trajectories = getFeetTrajectories();
+    setParameters(0.0);
+    update(true);
+  }
+  
+  LinearTransient(Steady move1, Steady move2){
+    this(move1, move2, 1.0, 0.0, 5.0);
+  }
+    
+  void setParameters(float phase){
+    if(LinearTransient.this.phase != phase){
+      this.phase = phase;
+      for(Parameter p : move1.parameters.values())
+        move.parameters.get(p.name).value = phase(phase, p.value, move2.get(p.name));
+      move.update(true);
+      trajectories = alltrajectories[min(getNPeriod(phase),alltrajectories.length-1)]; //<>//
+    }
+  }
+  
+  protected PVector[][] getFeetTrajectories(){
+    int nperiods = getNPeriod(1.0)+1, i=0;
+    alltrajectories = new PVector[nperiods][4][];
+    List<PVector[]> list = new ArrayList();
+    for(float p=0.0; i != alltrajectories.length; p+=dp){
+      PVector[] pts = new PVector[4];
+      for(int j=0; j<4; j++)
+        pts[j] = getFootPosition(j, p);
+      list.add(pts);
+      if(getNPeriod(p) > i){ //|| p+dp>1.0
+        for(int j=0; j<4; j++){
+          alltrajectories[i][j] = new PVector[list.size()];
+          for(int k=0; k<list.size(); k++){
+            alltrajectories[i][j][k] = list.get(k)[j];
+          }
+        }
+        i++;
+        list.clear();
+      }
+    }
+    return alltrajectories[0];
+  }
+    
+  int getNPeriod(float phase){
+    float ip=0.0, ip_1=0.0;
+    int period = 0;
+    for(float p=0.0; p<=phase; p+=dp, ip_1 = ip){
+      ip = getInnerPhase(p) % 1.0;
+      if(ip < ip_1) period++;
+    }
+    return period;
+  }
+  
+  float phase(float p, float v1, float v2){
+    return (1.0-min(p,1.0)) * v1 + min(p,1.0) * v2;
+  }
+  
+  float getInnerPeriod(float phase){
+    return phase(phase, t1, t2);
+  }
+  
+  float getInnerPhase(float phase){
+    if(t1==t2) return phase * get("duration") / t1;
+    if(phase<=1.0) return get("duration") / (t2-t1) * log( 1 + phase*(t2-t1)/t1 );
+    float p = get("duration") / (t2-t1) * log( 1 + (t2-t1)/t1 );  // Innerphase up to phase = 1
+    return p + (phase-1.0) * get("duration") / t2;  // Remainder where period is constant = t2
+}
+  
+  float getPeriod(){
+    return get("duration");
+  }
+  
+  PVector getSpeed(float phase){
+    setParameters(phase);
+    return move.getSpeed(getInnerPhase(phase));
+  }
+  
+  float getRotation(float phase){
+    setParameters(phase);
+    return move.getRotation(getInnerPhase(phase));
+  }
+  
+  PVector getFootPosition(int i, float phase){
+    setParameters(phase);
+    return move.getFootPosition(i, getInnerPhase(phase));
+  }
+  
+  boolean finished(float phase){
+    return phase >= 1.0 && (getInnerPhase(phase) - phase2) % 1.0 <= dt / getInnerPeriod(phase);
+  }
+  
+}
+
 
 /*
 class Start extends Transient {
