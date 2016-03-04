@@ -43,6 +43,17 @@ float interp(float x1, float x2, float y1, float y2, float x){
   return y1 + (x - x1) * (y2 - y1) / (x2 - x1);
 }
 
+Chart makeArduinoChart(){
+  return cp5.addChart("Arduino")
+               .setPosition(3,45)
+               .setSize(160, 60)
+               .setRange(0, 1024)
+               .setColorCaptionLabel(color(40))
+               .setView(Chart.BAR)
+               .addDataSet("arduino")
+               .setData("arduino", new float[] {300,900,700}); 
+}
+
 void updateArduinoChart(Chart c){
   if(arduino != null){
     c.setData(new float[]{arduino.analogRead(1), arduino.analogRead(2), arduino.analogRead(3)});

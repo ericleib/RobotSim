@@ -15,9 +15,8 @@ Frame frame;
 Leg[] legs = new Leg[4];
 
 // Current move of the robot
+MovePlanner planner;
 Move move;
-Steady walk, turn;
-LinearTransient trans;
 
 
 void setup() {
@@ -31,40 +30,31 @@ void setup() {
   setupCharts();
   setupArduino();
   
-  //move = new Walk(0.0, 20);    // 20° Crab walk 
-  walk = new Walk();     // Straight walk
-  turn = new Walk(5);    // Turn at 5°/s
-  turn.set("speed", 10.0);
-  trans = new LinearTransient(walk, turn, 10.0 / walk.getPeriod(), 0.0, 11.0);  // Transient between straight walk and turn;
-  move = walk;
-  //move = new Walk(1);   // Turn at 1°/s
-  // start = new Start(20.0);    // Start move from 0.0 to speed
+  // Example moves
+  Stand stand = new Stand();     // Standing
+  Walk walk = new Walk();        // Straight walk
+  Walk crab = new Walk(0.0, 20); // 20° Crab walk 
+  Walk turn = new Walk(5);       // Turn at 5°/s
   
-  //createSliders();
+  planner = new MovePlanner();
+  
+  // Uncomment for a constant move
+  planner.constantMove = true;
+  planner.addMove(walk);
+  
+  // Uncomment for a move sequence
+  //planner.constantMove = false;
+  //planner.addMove(stand, 5);
+  //planner.addMove(new LinearTransient(stand, turn, 0.0, 0.0, 11.0));
+  //planner.addMove(turn);
+     
 }
 
 
 void draw() {  
   background(240);   // background color
   
-  if(time <= 10 && move != walk){
-    move = walk;
-    phase = 0;
-    //createSliders();
-    
-  }else if(time > 10 && time <= 21 && move != trans){
-    move = trans;
-    phase = 0;
-    //createSliders();
-    
-  }else if(time > 21 && trans.finished(phase) && move != turn){
-    move = turn;
-    phase = 0;
-    //createSliders();
-  }
-  
-  //println("phase: "+phase+" ("+move.name+")");
-  
+  planner.setMove();    // Sets the current move
       
   for(int i=0; i<4; i++){  // For each leg
     legs[i].foot = move.getFootPosition(i, phase);  // Trajectory planning
@@ -90,10 +80,14 @@ void updateTime(){
   if(!pause)
     time += 1.0 / FPS; 
   dt = time-time_1;
-  if(!Float.isNaN(move.getPeriod()))
+  if(Float.isFinite(move.getPeriod())){
+    if(move.getPeriod()==0)
+      println("Warning: period==0 must be prevented!");
     phase += dt / move.getPeriod();   // Increment of phase: dt / T
+  }
   time_1 = time;
   if(reset){
+    planner.reset();
     reset = false;
     time = 0.0;
     time_1 = 0.0;

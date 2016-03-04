@@ -15,7 +15,7 @@ class Frame extends Drawable {
   
   PVector getCG(){ return new PVector(getLength() * 0.50, getWidth() * 0.50, getHeight()); }
   
-  
+  // Calculate the triangles formed by the legs, and check if the CG is inside
   void computeStabilityTriangles(){
     stable.clear(); unstable.clear();
     for(int i=0; i<4; i++){

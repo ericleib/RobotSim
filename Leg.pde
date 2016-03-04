@@ -1,12 +1,13 @@
 class Leg extends Drawable {
   
   
-  boolean right, forward;
-  PVector slot, shoulder, knee, foot;
+  boolean right, forward;  // To differentiate the different legs
   
-  float theta, phi, psi, thetad, phid, psid;
+  PVector slot, shoulder, knee, foot;  // Coordinates of each articulation
   
-  PVector[] footTrajectory;
+  float theta, phi, psi;  // Angles of each articulation (in degrees)
+  
+  PVector[] footTrajectory;  // Table containing the trajectory of the foot over one period
   
   
   Leg(PVector slot, boolean right, boolean forward){
@@ -52,16 +53,10 @@ class Leg extends Drawable {
     knee = pt.add(foot_shoulder().cross(normal).mult(h/d));
   }
   
-  void computeAngles(){  
-    float theta_ = theta;
-    float phi_ = phi;
-    float psi_ = psi;
+  void computeAngles(){
     theta = degrees( atan((shoulder.z-slot.z) / (shoulder.y-slot.y) ));
     phi = degrees( PVector.angleBetween(new PVector(-1,0,0), shoulder_knee()));
     psi = degrees( PVector.angleBetween(shoulder_knee(), knee_foot()));
-    thetad = (theta - theta_)*FPS;
-    phid = (phi - phi_)*FPS;
-    psid = (psi - psi_)*FPS;
   }
 
   void draw(View v){

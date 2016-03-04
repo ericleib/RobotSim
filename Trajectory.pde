@@ -17,6 +17,10 @@ class Trajectory {
     addSegment(new Line(p1,p2));
   }
   
+  void addSegment(PVector p1){
+    addSegment(new Point(p1));
+  }
+  
   void addSegment(Segment s){
     segments.add(s);
     length += s.length;
@@ -24,8 +28,12 @@ class Trajectory {
   }
   
   void setGroundRatio(float k){
-    for(Segment s : segments)  // Set the phase for each segment, in function of the ratio (speed is assumed constant on respectively air and ground)
-      s.phase = s.length * (s.ground? k / length_grd : (1 - k) / (length - length_grd));
+    if(length==0){
+      segments.get(0).phase = 1.0;    // Case of degenerate trajectory
+    }else{
+      for(Segment s : segments)  // Set the phase for each segment, in function of the ratio (speed is assumed constant on respectively air and ground)
+        s.phase = s.length * (s.ground? k / length_grd : (1 - k) / (length - length_grd));
+    }
   }
   
   PVector point(float phase){
@@ -52,6 +60,20 @@ abstract class Segment {
   boolean ground;
   
   abstract PVector pointLin(float phase);
+}
+
+class Point extends Segment {
+  PVector p;
+  
+  Point(PVector p){
+    this.p = p;
+    length = 0.0;
+    ground = p.z==0;
+  }
+  
+  PVector pointLin(float t){
+    return p.copy();
+  }
 }
 
 class Line extends Segment {

@@ -1,7 +1,7 @@
 import controlP5.*;    // import controlP5 library
 
 ControlP5 cp5;   // controlP5 object
-Chart phiChart, psiChart, thetaChart, phidChart, psidChart, arduChart;
+Chart phiChart, psiChart, thetaChart, arduChart;
 List<Controller> sliders = new ArrayList();
 
 void setupCharts(){
@@ -14,17 +14,8 @@ void setupCharts(){
   phiChart = makeChart("phi", 0, 0, 180);
   psiChart = makeChart("psi", 1, 0, 180);
   thetaChart = makeChart("theta", 2, -90, 90);
-  //phidChart = makeChart("phid", 2, -60, 60);
-  //psidChart = makeChart("psid", 3, -60, 60);
-
-  arduChart = cp5.addChart("Arduino")
-               .setPosition(3,45)
-               .setSize(160, 60)
-               .setRange(0, 1024)
-               .setColorCaptionLabel(color(40))
-               .setView(Chart.BAR)
-               .addDataSet("arduino")
-               .setData("arduino", new float[] {300,900,700});
+  
+  arduChart = makeArduinoChart();  // cf arduino tab
 }
 
 void createSliders(){
@@ -32,7 +23,7 @@ void createSliders(){
     for(Controller c:sliders)
       cp5.remove(c.getName());
     sliders.clear();
-    int i=0, j=0;
+    int i=0, j=0;  // Line & column of sliders
     for(Parameter p:move.parameters.values()){
       Controller c = cp5.addSlider(p.name, p.min, p.max, p.value, 170+j*350, 5+(i++)*17, 280, 15);
       c.getValueLabel().getStyle().margin(0,0,0,3);
@@ -49,7 +40,7 @@ void updateCharts(){
     phiChart.push("phi", legs[0].phi);
     psiChart.push("psi", legs[0].psi);
     thetaChart.push("theta", legs[0].theta);
-    updateArduinoChart(arduChart);
+    updateArduinoChart(arduChart);  // cf arduino tab
   }
 }
 
@@ -63,8 +54,7 @@ Chart makeChart(String name, int n, float min, float max){
                .setColorBackground(color(255))
                .setStrokeWeight(3)
                .setColorCaptionLabel(color(40))
-               .addDataSet(name)
-               ;
+               .addDataSet(name);
 }
 
 void controlEvent(ControlEvent e) {
@@ -75,8 +65,5 @@ void controlEvent(ControlEvent e) {
     else
       time += (e.getName()=="next"? 1.0 : -1.0) / FPS;
   if(e.getName()=="reset") reset = true;
-  if(e.getController() instanceof Slider){
-    move.set(e.getName(), e.getValue());
-    move.update();
-  }
+  if(e.getController() instanceof Slider) move.set(e.getName(), e.getValue());
 }

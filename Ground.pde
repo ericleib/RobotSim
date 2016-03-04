@@ -1,7 +1,7 @@
 class Ground extends Drawable {
     
   float angle = HALF_PI*0.5;  // Angle of the grid
-  PVector grid_point = new PVector(0.0, 0.0, 0.0);  // Point of the grid
+  PVector grid_point = new PVector(0.0, 0.0, 0.0);  // Arbitrary point of the grid
   
   void draw(View v){
     
