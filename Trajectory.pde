@@ -1,5 +1,9 @@
 import java.util.*;
 
+PVector EX = new PVector(1,0,0);
+PVector EY = new PVector(0,1,0);
+PVector EZ = new PVector(0,0,1);
+
 class Trajectory {
  
   List<Segment> segments = new ArrayList();
@@ -133,4 +137,71 @@ class Bezier extends Segment {
       return point( (i + (l-lengths[i])/(lengths[i+1]-lengths[i])) / STEPS );  // Interpolate in the bezier
     }   
   }
+}
+
+class Oscillation extends Segment {
+  
+  PVector p1, p2, v;
+  float dphase, freq;
+  
+  Oscillation(PVector p1, PVector p2, float dphase, float freq){
+    this.p1 = p1;
+    this.p2 = p2;
+    this.v = p2.copy().sub(p1);
+    this.dphase = dphase;
+    this.freq = freq;
+  }
+  
+  Oscillation(PVector p1, PVector p2, float phase){
+    this(p1, p2, phase, 1.0);
+  }
+  
+  Oscillation(PVector p1, PVector p2){
+    this(p1, p2, 0.0);
+  }
+  
+  PVector pointLin(float phase){
+    float t = 0.5 - 0.5 * cos((dphase + freq*phase) * 2 * PI);
+    return p1.copy().add(v.copy().mult(t));
+  }
+  
+  PVector speed(float phase){
+    return v.copy().mult(-PI * freq * sin((dphase + freq*phase) * 2 * PI));
+  }
+}
+
+class Rotation {
+ 
+  float q0, q1, q2, q3;
+  
+  Rotation(float q0, float q1, float q2, float q3){
+    set(q0, q1, q2, q3);
+  }
+  
+  Rotation(PVector axis, float angle){
+    float coeff = sin(-0.5 * angle) / axis.mag();
+    set(cos(-0.5 * angle), coeff * axis.x, coeff * axis.y, coeff * axis.z);
+  }
+  
+  void set(float q0, float q1, float q2, float q3){   
+    this.q0 = q0; 
+    this.q1 = q1;
+    this.q2 = q2;
+    this.q3 = q3; 
+  }
+  
+  PVector rotate(PVector v){
+    float s = q1 * v.x + q2 * v.y + q3 * v.z;
+    return new PVector(2 * (q0 * (v.x * q0 - (q2 * v.z - q3 * v.y)) + s * q1) - v.x,
+                        2 * (q0 * (v.y * q0 - (q3 * v.x - q1 * v.z)) + s * q2) - v.y,
+                        2 * (q0 * (v.z * q0 - (q1 * v.y - q2 * v.x)) + s * q3) - v.z);
+  }
+  
+  Rotation compose(Rotation r){
+    return new Rotation(r.q0 * q0 - (r.q1 * q1 + r.q2 * q2 + r.q3 * q3),
+                        r.q1 * q0 + r.q0 * q1 + (r.q2 * q3 - r.q3 * q2),
+                        r.q2 * q0 + r.q0 * q2 + (r.q3 * q1 - r.q1 * q3),
+                        r.q3 * q0 + r.q0 * q3 + (r.q1 * q2 - r.q2 * q1));
+  }
+  
 }

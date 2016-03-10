@@ -37,9 +37,9 @@ void createSliders(){
 
 void updateCharts(){
   if(cp5!=null){
-    phiChart.push("phi", legs[0].phi);
-    psiChart.push("psi", legs[0].psi);
-    thetaChart.push("theta", legs[0].theta);
+    phiChart.push("phi", degrees(legs[0].phi));
+    psiChart.push("psi", degrees(legs[0].psi));
+    thetaChart.push("theta", degrees(legs[0].theta));
     updateArduinoChart(arduChart);  // cf arduino tab
   }
 }

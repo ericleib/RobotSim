@@ -94,22 +94,22 @@ abstract class Move {
     return pts;
   }
   
-  Trajectory makeStepTrajectory(float dx, float dy, float dr, float h, float k){
+  Trajectory makeStepTrajectory(PVector foot_ref, float dx, float dr, float h, float k){
     Trajectory t = new Trajectory();
     if(dx!=0){
-      t.addSegment(new PVector(dx, dy + dx * tan(dr), 0.0), new PVector(-dx, dy - dx * tan(dr), 0.0));
-      t.addSegment(new PVector(-dx, dy - dx * tan(dr), 0.0), new PVector(-dx, dy - dx * tan(dr), h), new PVector(-h, dy -h * tan(dr), h), new PVector(0, dy, h));
-      t.addSegment(new PVector(0, dy, h), new PVector(dx, dy + dx * tan(dr), h));
-      t.addSegment(new PVector(dx, dy + dx * tan(dr), h), new PVector(dx+h, dy + (dx+h) * tan(dr), h), new PVector(dx+h, dy + (dx+h) * tan(dr), 0), new PVector(dx, dy + dx * tan(dr), 0));
+      t.addSegment(foot_ref.copy().add(dx, dx * tan(dr), 0), foot_ref.copy().add(-dx, -dx * tan(dr), 0));
+      t.addSegment(foot_ref.copy().add(-dx, - dx * tan(dr), 0.0), foot_ref.copy().add(-dx, - dx * tan(dr), h), foot_ref.copy().add(-h, - h * tan(dr), h), foot_ref.copy().add(0, 0, h));
+      t.addSegment(foot_ref.copy().add(0, 0, h), foot_ref.copy().add(dx, dx * tan(dr), h));
+      t.addSegment(foot_ref.copy().add(dx, dx * tan(dr), h), foot_ref.copy().add(dx+h, (dx+h) * tan(dr), h), foot_ref.copy().add(dx+h, (dx+h) * tan(dr), 0), foot_ref.copy().add(dx, dx * tan(dr), 0));
     }else{
-      t.addSegment(new PVector(0, dy, 0));
+      t.addSegment(foot_ref);
     }
     t.setGroundRatio(k);
     return t;
   }
   
   PVector getSpeed(float phase, PVector point){
-    return getSpeed(phase).add(frame.getCG().sub(point).cross(new PVector(0,0,getRotation(phase))));  // Speed of the point = Speed(CG) + point->cg ^ Rotation
+    return getSpeed(phase).add(frame.frameCG.copy().sub(point).cross(new PVector(0,0,getRotation(phase))));  // Speed of the point = Speed(CG) + point->cg ^ Rotation
   }
   
   void set(String name, float value){
@@ -132,7 +132,7 @@ abstract class Steady extends Move {
   
   abstract float getRotation();
   
-  PVector getSpeed(PVector point){ return getSpeed().add(frame.getCG().sub(point).cross(new PVector(0,0,getRotation()))); }  // Speed of the point = Speed(CG) + point->cg ^ Rotation
+  PVector getSpeed(PVector point){ return getSpeed().add(frame.frameCG.copy().sub(point).cross(new PVector(0,0,getRotation()))); }  // Speed of the point = Speed(CG) + point->cg ^ Rotation
   
   PVector getSpeed(float phase){ return getSpeed();}
   
@@ -165,6 +165,7 @@ abstract class Transient extends Move {
 class Walk extends Steady {
   
   Trajectory[] t = new Trajectory[4];
+  Oscillation osc;
     
   Walk(){ this(0.0, 0.0); }
   
@@ -172,8 +173,10 @@ class Walk extends Steady {
   
   Walk(float rotation, float dr){
     put(new Parameter("speed", 20.0, 0.0, 100.0));
-    put(new Parameter("dx", 20.0, 0.0, 50.0));
-    put(new Parameter("dy", 15.0, 0.0, 50.0));
+    put(new Parameter("shift_x", -2.0, -20.0, 20.0));
+    put(new Parameter("shift_y", 0.0, -20.0, 20.0));
+    put(new Parameter("dx", 40.0, 0.0, 50.0));
+    put(new Parameter("dy", 25.0, 0.0, 50.0));
     put(new Parameter("dz", 10.0, 0.0, 50.0));
     put(new Parameter("dr", dr, 0.0, 60.0));
     put(new Parameter("k_ground", 0.8, 0.0, 1.0));
@@ -182,34 +185,37 @@ class Walk extends Steady {
     put(new Parameter("phase2", 0.00, 0, 1.0));
     put(new Parameter("phase3", 0.75, 0, 1.0));
     put(new Parameter("phase4", 0.50, 0, 1.0));
+    put(new Parameter("phase_osc", 0.20, 0, 1.0));
+    put(new Parameter("ampl_osc", 10.0, 0, 20.0));
     update();
   }
   
   void update(boolean quick){
-    name = getRotation()==0.0 ? (getSpeed().x==0? "Standing" : (get("dr")==0? "Straight " : "Crab ")+"Walk") : "Turn "+nf(degrees(getRotation()),1,2)+"°/s";
-    float dy = SCALE*get("dy");
-    float k = get("k_ground");
+    name = getRotation()==0.0 ? (get("speed")==0? "Standing" : (get("dr")==0? "Straight " : "Crab ")+"Walk") : "Turn "+nf(degrees(getRotation()),1,2)+"°/s";
+    osc = new Oscillation(new PVector(0,0,0), new PVector(0,0,0), 0, 1.0); // No oscillation to define the nominal trajectories of the legs (for turns)
     for(int i=0; i<4; i++){      // for each leg
-      PVector v = getSpeed(legs[i].slot.copy().add(0, legs[i].right? dy : -dy, 0));  // Local speed of the leg
-      float dx = SCALE*get("dx") * (getRotation()==0.0 ? 1.0 : v.x / getSpeed().x);
+      PVector foot_ref = legs[i].slot.copy().add(SCALE*get("shift_x"), SCALE*get("shift_y") + SCALE*get("dy") * legs[i].right(), -frame.getHeight());
+      PVector v = getSpeed(foot_ref);  // Local speed of the leg : Problem: this includes the oscillations...
+      float dx = SCALE*get("dx") * (getRotation()==0.0 ? 1.0 : v.x / (SCALE*get("speed")));
       float dr = getRotation()==0.0 ? radians(get("dr")) : atan(v.y/v.x); // warning: some particular cases where rotation!=0 and v.x = 0
       //println(dx+" "+dy+" "+degrees(dr)+" "+get("dz")+" "+k);
-      t[i] = makeStepTrajectory(dx, legs[i].right? dy : -dy, dr, SCALE*get("dz"), k);  // Left forward //<>//
+      t[i] = makeStepTrajectory(foot_ref, dx, dr, SCALE*get("dz"), get("k_ground"));  // Left forward //<>//
     }
+    osc = new Oscillation(new PVector(0,-SCALE*get("ampl_osc"),0), new PVector(0,SCALE*get("ampl_osc"),0), get("phase_osc"), 1.0);  // Now we add oscillations
     super.update(quick);
   }
   
   float getPeriod(){  // Period of the movement
     if(get("dx")==0.0) return 1.0; // Case of degenerate trajectory
-    return SCALE*get("dx") / (0.5 * get("k_ground") * getSpeed().x);
+    return SCALE*get("dx") / (0.5 * get("k_ground") * SCALE*get("speed"));
   }
   
   PVector getFootPosition(int i, float phase){
     float ph = (phase + get("phase"+(i+1))) % 1.0;
-    return t[i].point(ph).add(legs[i].slot).add(0,0,-frame.getHeight());
+    return t[i].point(ph).add(osc.pointLin(phase));
   }
   
-  PVector getSpeed(){ return new PVector(SCALE*get("speed"), SCALE*get("speed")*tan(radians(get("dr"))), 0.0); }
+  PVector getSpeed(){ return new PVector(SCALE*get("speed"), SCALE*get("speed")*tan(radians(get("dr"))), 0.0).add(osc.speed(phase).mult(1.0/getPeriod())); }
   
   float getRotation(){ return radians(get("rotation")); }
 }

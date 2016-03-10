@@ -1,7 +1,7 @@
 
 // Simulation parameters
 int FPS = 50;    // Frames per second
-float SCALE = 3.0;  // pixels / mm
+float SCALE = 2.5;  // pixels / mm
 float time = 0.0;  // Time (in seconds)
 float time_1 = 0.0;  // Time - 1 (in seconds)
 float dt = 1.0 / FPS;
@@ -21,15 +21,14 @@ Move move;
 
 void setup() {
   frameRate(FPS);
-  size(1024, 720);
+  size(1280, 850);
   surface.setResizable(true);
-  smooth();
   
   createObjects();
   createViews();    // Note: views must be created AFTER objects (because they depend on their dimensions)
   setupCharts();
-  setupArduino();
-  
+  //setupArduino();
+    
   // Example moves
   Stand stand = new Stand();     // Standing
   Walk walk = new Walk();        // Straight walk
@@ -59,9 +58,9 @@ void draw() {
   for(int i=0; i<4; i++){  // For each leg
     legs[i].foot = move.getFootPosition(i, phase);  // Trajectory planning
     legs[i].footTrajectory = move.trajectories[i]; 
-    legs[i].resolve();  // Inverse kinematics
+    legs[i].resolve();  // Inverse kinematics & CG
   }
-  frame.computeStabilityTriangles();  // Static stability
+  frame.resolve();  // Compute CG and stability triangles
   
   drawViews(); // Draw the views
   
@@ -101,4 +100,24 @@ void createObjects(){
   legs[1] = new Leg(new PVector(frame.getLength(), 0, frame.getHeight()), false, true);
   legs[2] = new Leg(new PVector(0, frame.getWidth(), frame.getHeight()), true, false);
   legs[3] = new Leg(new PVector(frame.getLength(), frame.getWidth(), frame.getHeight()), true, true);
+}
+
+void computeCalibrationPoints(){
+  for(int i = 0; i<3; i++){
+    for(int j = 0; j<3; j++){
+      PVector pt = new PVector(SCALE*(-20.0+i*20.0), SCALE*(-20.0+j*20.0), 0.0);
+      for(int k=0; k<4; k++){
+        Leg leg = legs[k];
+        PVector foot = leg.slot.copy();
+        if(leg.right){
+          foot.add(0, leg.shoulderWidth, -frame.getHeight()).add(pt);
+        }else{
+          foot.add(0, -leg.shoulderWidth, -frame.getHeight()).add(pt);
+        }
+        leg.foot = foot;
+        leg.resolve();
+        println(degrees(leg.theta)+" "+degrees(leg.phi)+" "+degrees(leg.psi));
+      }
+    }  
+  } 
 }

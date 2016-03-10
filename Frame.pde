@@ -4,16 +4,28 @@ class Frame extends Drawable {
   // Stable and unstable triangles
   List<PVector[]> stable = new ArrayList(), unstable = new ArrayList();
   
+  float frameMass = 380;
+  float mass;     // Compute Robot mass
+  PVector frameCG = new PVector(getLength() * 0.50, getWidth() * 0.50, getHeight()+SCALE*10);
+  PVector cg;     // Computed Robot CG
     
   float getThickness(){  return SCALE*5.0; }
   
-  float getWidth(){  return SCALE*40.0; }
+  float getWidth(){  return SCALE*54.0; }
   
-  float getLength(){  return SCALE*100.0; }
+  float getLength(){  return SCALE*139.0; }
   
-  float getHeight(){ return SCALE*50 * 1.40; }
+  float getHeight(){ return SCALE*80.0; }
   
-  PVector getCG(){ return new PVector(getLength() * 0.50, getWidth() * 0.50, getHeight()); }
+  
+  
+  void resolve(){
+    mass = frameMass + legs[0].mass + legs[1].mass + legs[2].mass + legs[3].mass;
+    cg = frameCG.copy().mult(frameMass/mass);
+    for(int i=0; i<4; i++)
+      cg.add(legs[i].cg.copy().mult(legs[i].mass / mass));
+    computeStabilityTriangles();  // Static stability
+  }
   
   // Calculate the triangles formed by the legs, and check if the CG is inside
   void computeStabilityTriangles(){
@@ -25,7 +37,7 @@ class Frame extends Drawable {
         points[j] = legs[k].foot;
       }
       if(points[0].z==0.0 && points[1].z==0.0 && points[2].z==0.0){
-        if(pointInTriangle(points, getCG()))
+        if(pointInTriangle(points, cg))
           stable.add(points);
         else
           unstable.add(points);
@@ -74,7 +86,10 @@ class Frame extends Drawable {
       v.setGreen();
     else
       v.setRed();
-    v.cg(getCG());
+    v.cg(cg);
+    v.stroke(100);
+    v.cg(frameCG);
+    //println(cg.x + " "+frameCG.x);
   }
   
 }
