@@ -94,15 +94,17 @@ abstract class Move {
     return pts;
   }
   
-  Trajectory makeStepTrajectory(PVector foot_ref, float dx, float dr, float h, float k){
+  Trajectory makeStep(PVector foot, float dx, float dr, float h, float k){
     Trajectory t = new Trajectory();
     if(dx!=0){
-      t.addSegment(foot_ref.copy().add(dx, dx * tan(dr), 0), foot_ref.copy().add(-dx, -dx * tan(dr), 0));
-      t.addSegment(foot_ref.copy().add(-dx, - dx * tan(dr), 0.0), foot_ref.copy().add(-dx, - dx * tan(dr), h), foot_ref.copy().add(-h, - h * tan(dr), h), foot_ref.copy().add(0, 0, h));
-      t.addSegment(foot_ref.copy().add(0, 0, h), foot_ref.copy().add(dx, dx * tan(dr), h));
-      t.addSegment(foot_ref.copy().add(dx, dx * tan(dr), h), foot_ref.copy().add(dx+h, (dx+h) * tan(dr), h), foot_ref.copy().add(dx+h, (dx+h) * tan(dr), 0), foot_ref.copy().add(dx, dx * tan(dr), 0));
+      float dy = dx * tan(dr);
+      float dyh = dy * h / dx;
+      t.addSegment(foot.copy().add(dx, dy, 0),     foot.copy().add(-dx, -dy, 0));
+      t.addSegment(foot.copy().add(-dx, -dy, 0.0), foot.copy().add(-dx, -dy, h),     foot.copy().add(-h, - dyh, h),    foot.copy().add(0, 0, h));
+      t.addSegment(foot.copy().add(0, 0, h),       foot.copy().add(dx, dy, h));
+      t.addSegment(foot.copy().add(dx, dy, h),     foot.copy().add(dx+h, dy+dyh, h), foot.copy().add(dx+h, dy+dyh, 0), foot.copy().add(dx, dy, 0));
     }else{
-      t.addSegment(foot_ref);
+      t.addSegment(foot);
     }
     t.setGroundRatio(k);
     return t;
@@ -132,7 +134,7 @@ abstract class Steady extends Move {
   
   abstract float getRotation();
   
-  PVector getSpeed(PVector point){ return getSpeed().add(frame.frameCG.copy().sub(point).cross(new PVector(0,0,getRotation()))); }  // Speed of the point = Speed(CG) + point->cg ^ Rotation
+  PVector getSpeed(PVector point){ return getSpeed(0.0, point); }  // Speed of the point = Speed(CG) + point->cg ^ Rotation
   
   PVector getSpeed(float phase){ return getSpeed();}
   
@@ -192,14 +194,14 @@ class Walk extends Steady {
   
   void update(boolean quick){
     name = getRotation()==0.0 ? (get("speed")==0? "Standing" : (get("dr")==0? "Straight " : "Crab ")+"Walk") : "Turn "+nf(degrees(getRotation()),1,2)+"°/s";
-    osc = new Oscillation(new PVector(0,0,0), new PVector(0,0,0), 0, 1.0); // No oscillation to define the nominal trajectories of the legs (for turns)
+    osc = new Oscillation(new PVector(0,0,0), new PVector(0,0,0)); // No oscillation to define the nominal trajectories of the legs (for turns)
     for(int i=0; i<4; i++){      // for each leg
       PVector foot_ref = legs[i].slot.copy().add(SCALE*get("shift_x"), SCALE*get("shift_y") + SCALE*get("dy") * legs[i].right(), -frame.getHeight());
       PVector v = getSpeed(foot_ref);  // Local speed of the leg : Problem: this includes the oscillations...
       float dx = SCALE*get("dx") * (getRotation()==0.0 ? 1.0 : v.x / (SCALE*get("speed")));
       float dr = getRotation()==0.0 ? radians(get("dr")) : atan(v.y/v.x); // warning: some particular cases where rotation!=0 and v.x = 0
       //println(dx+" "+dy+" "+degrees(dr)+" "+get("dz")+" "+k);
-      t[i] = makeStepTrajectory(foot_ref, dx, dr, SCALE*get("dz"), get("k_ground"));  // Left forward //<>//
+      t[i] = makeStep(foot_ref, dx, dr, SCALE*get("dz"), get("k_ground"));  // Left forward //<>//
     }
     osc = new Oscillation(new PVector(0,-SCALE*get("ampl_osc"),0), new PVector(0,SCALE*get("ampl_osc"),0), get("phase_osc"), 1.0);  // Now we add oscillations
     super.update(quick);
@@ -207,7 +209,7 @@ class Walk extends Steady {
   
   float getPeriod(){  // Period of the movement
     if(get("dx")==0.0) return 1.0; // Case of degenerate trajectory
-    return SCALE*get("dx") / (0.5 * get("k_ground") * SCALE*get("speed"));
+    return get("dx") / (0.5 * get("k_ground") * get("speed"));
   }
   
   PVector getFootPosition(int i, float phase){
