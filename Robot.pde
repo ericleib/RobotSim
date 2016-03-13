@@ -2,12 +2,12 @@
 // Simulation parameters
 int FPS = 50;    // Frames per second
 float SCALE = 2.5;  // pixels / mm
-float time = 0.0;  // Time (in seconds)
-float time_1 = 0.0;  // Time - 1 (in seconds)
-float dt = 1.0 / FPS;
-float phase = 0.0;  // General phase
-boolean pause = false;  // Whether the simulation is paused or not
-boolean reset = false;  // Flag to reset the simulation
+float TIME = 0.0;  // Time (in seconds)
+float TIME_1 = 0.0;  // Time - 1 (in seconds)
+float DT = 1.0 / FPS;
+float PHASE = 0.0;  // General phase, which controls the progress of moves
+boolean PAUSE = false;  // Whether the simulation is paused or not
+boolean RESET = false;  // Flag to reset the simulation
 
 // Objects in the simulation
 Ground ground;
@@ -16,7 +16,7 @@ Leg[] legs = new Leg[4];
 
 // Current move of the robot
 MovePlanner planner;
-Move move;
+Move MOVE;
 
 
 void setup() {
@@ -34,33 +34,31 @@ void setup() {
   Walk walk = new Walk();        // Straight walk
   Walk crab = new Walk(0.0, 20); // 20° Crab walk 
   Walk turn = new Walk(5);       // Turn at 5°/s
+  //turn.set("ampl_osc", 0.0);
   
   planner = new MovePlanner();
   
   // Uncomment for a constant move
-  planner.constantMove = true;
-  planner.addMove(walk);
+  //planner.addMove(walk);
   
   // Uncomment for a move sequence
-  //planner.constantMove = false;
-  //planner.addMove(stand, 5);
-  //planner.addMove(new LinearTransient(stand, turn, 0.0, 0.0, 11.0));
-  //planner.addMove(turn);
+  planner.addMove(stand, 3);
+  planner.addMove(new LinearTransient(stand, turn), 3.0);
+  planner.addMove(turn);
      
 }
 
 
 void draw() {  
-  background(240);   // background color
-  
-  planner.setMove();    // Sets the current move
+  MOVE = planner.getMove(PHASE);    // Sets the current move
       
   for(int i=0; i<4; i++){  // For each leg
-    legs[i].foot = move.getFootPosition(i, phase);  // Trajectory planning
-    legs[i].footTrajectory = move.trajectories[i]; 
+    legs[i].foot = MOVE.getFootPosition(i, PHASE);  // Trajectory planning
+    legs[i].footTrajectory = MOVE.trajectories[i]; 
     legs[i].resolve();  // Inverse kinematics & CG
   }
   frame.resolve();  // Compute CG and stability triangles
+  ground.resolve(MOVE, PHASE, DT);  // Compute ground position variation
   
   drawViews(); // Draw the views
   
@@ -74,22 +72,23 @@ void draw() {
 
 void updateTime(){
   fill(0);
-  text(nf(time,1,2)+" sec", 3, 15);
-  text(move.name, 80, 15);
-  if(!pause)
-    time += 1.0 / FPS; 
-  dt = time-time_1;
-  if(Float.isFinite(move.getPeriod())){
-    if(move.getPeriod()==0)
+  text(nf(TIME,1,2)+" sec", 3, 15);
+  text(MOVE.getName(), 80, 15);
+  if(!PAUSE)
+    TIME += 1.0 / FPS; 
+  DT = TIME-TIME_1;
+  float period = MOVE.getPeriod(PHASE);
+  if(Float.isFinite(period)){
+    if(period==0)
       println("Warning: period==0 must be prevented!");
-    phase += dt / move.getPeriod();   // Increment of phase: dt / T
+    PHASE += DT / period;   // Increment of phase: dt / T
   }
-  time_1 = time;
-  if(reset){
-    planner.reset();
-    reset = false;
-    time = 0.0;
-    time_1 = 0.0;
+  TIME_1 = TIME;
+  if(RESET){
+    RESET = false;
+    PHASE = 0.0;
+    TIME = 0.0;
+    TIME_1 = 0.0;
   }
 }
 

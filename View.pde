@@ -9,6 +9,7 @@ void createViews(){
 }
 
 void drawViews(){
+  background(240);   // background color
   TOP.draw();
   SIDE.draw();
   FRONT.draw(); 

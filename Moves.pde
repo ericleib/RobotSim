@@ -1,96 +1,64 @@
 
 class MovePlanner {
   
-  List<Move> moves = new ArrayList();
-  List<Float> durations = new ArrayList();
-  List<Float> starts = new ArrayList();
-  int imove = 0;
-  boolean constantMove = true;
+  List<Move> moves = new ArrayList();   // List of planned moves
   
-  void addMove(Move move, float duration){
+  void addMove(Move move, float duration) {  // Moves are added at the beginning
+    move.duration = duration;
+    move.phase0 = moves.size() == 0 ? 0.0 : moves.get(moves.size()-1).phase0 + moves.get(moves.size()-1).duration;
+    move.update();  // init trajectories, taking start phase into account
     moves.add(move);
-    durations.add(duration);
-    if(moves.size()==1)
-      starts.add(0.0);
   }
   
-  void addMove(Move move){
-    addMove(move, 0.0);
-  }
+  void addMove(Move move){ addMove(move, 0.0); }
   
-  void addMove(Transient move){
-    addMove(move, move.getPeriod());
-  }
-  
-  void reset(){
-    starts.clear();
-    imove = 0;
-    starts.add(0.0);
-  }
-  
-  void setMove(){
-    if(constantMove){
-      if(move != moves.get(0)){
-        move = moves.get(0);
-        createSliders();
-      }
-    } else {
-      move = moves.get(imove);
-      float duration = durations.get(imove);
-      float start = starts.get(imove);
-      //println(move.name+" "+time+" "+start+" "+duration);
-      if(duration>0 && time - start >= duration && move.finished(phase)){  // Note: this blocks assumes that times goes positively... Next button fails...
-        imove++;
-        starts.add(time);
-        if(move instanceof Transient)
-          phase = ((Transient)move).phase2;  // If the previous move is a transient, we reset the phase to the initial phase of the next move
-        move = moves.get(imove);
-        if(move instanceof Transient)  // If the new move is a transient, set the phase to 0
-          phase = 0.0;
-          
-      }else if(time < start){
-        imove--;
-        starts.remove(starts.size()-1);
-        setMove();
-      }
+  Move getMove(float phase){  // Moves are retrieved in function of phase
+    Move move = moves.get(0);
+    for(Move m : moves){
+      if(m.phase0 > phase)
+        break;
+      move = m;
     }
+    if(move == moves.get(moves.size()-1))
+      createSliders(move);    // Sliders are added only for the last move
+    else
+      removeSliders();
+    return move;
   }
 }
+
 
 abstract class Move {
   
   Map<String,Parameter> parameters = new LinkedHashMap();
   PVector[][] trajectories;
-  String name;
+  float phase0, duration;
   
-  abstract float getPeriod();
+  abstract String getName();
+  
+  abstract float getPeriod(float phase);
   
   abstract PVector getSpeed(float phase);
   
   abstract float getRotation(float phase);
   
   abstract PVector getFootPosition(int i, float phase);
-  
-  abstract boolean finished(float phase);
-  
+    
   void update(boolean quick){
     if(!quick)
-      trajectories = getFeetTrajectories();
+      trajectories = getFeetTrajectories(phase0);
   }
   
   void update(){
     update(false);
   }
   
-  protected PVector[][] getFeetTrajectories(){
-    int npoints = min((int) (FPS * getPeriod()), 200);
+  protected PVector[][] getFeetTrajectories(float phase){
+    int npoints = min((int) (FPS * getPeriod(phase)), 200);
     PVector[][] pts = new PVector[4][npoints];
-    //println("get trajectories: "+getPeriod()+" "+npoints);
-    for(int i=0; i<4; i++){
-      //println("leg: "+i);
-      for(int j=0; j<npoints; j++)
-        pts[i][j] = getFootPosition(i, ((float)j)/npoints);
-    }
+    for(int i=0; i<4; i++)
+      for(float j=0; j<npoints; j++)
+        pts[i][(int)j] = getFootPosition(i, phase + j/npoints);
     return pts;
   }
   
@@ -128,39 +96,24 @@ abstract class Move {
   }
 }
 
+
+// STEADY MOVES
+
 abstract class Steady extends Move {
+  
+  abstract float getPeriod();
   
   abstract PVector getSpeed();
   
   abstract float getRotation();
+  
+  float getPeriod(float phase){ return getPeriod();}
   
   PVector getSpeed(PVector point){ return getSpeed(0.0, point); }  // Speed of the point = Speed(CG) + point->cg ^ Rotation
   
   PVector getSpeed(float phase){ return getSpeed();}
   
   float getRotation(float phase){ return getRotation();}
-  
-  boolean finished(float phase){ return true; }
-}
-
-abstract class Transient extends Move {
-  
-  Steady move1, move2;
-  float phase1, phase2;
-  float t1, t2;
-  
-  Transient(Steady move1, Steady move2, float phase1, float phase2){
-    this.move1 = move1;
-    this.move2 = move2;
-    this.phase1 = phase1;
-    this.phase2 = phase2;
-    t1 = move1.getPeriod();
-    t2 = move2.getPeriod();
-  }
-  
-  Transient(Steady move1, Steady move2){
-    this(move1, move2, 1.0, 0.0);
-  }
   
 }
 
@@ -189,11 +142,13 @@ class Walk extends Steady {
     put(new Parameter("phase4", 0.50, 0, 1.0));
     put(new Parameter("phase_osc", 0.20, 0, 1.0));
     put(new Parameter("ampl_osc", 10.0, 0, 20.0));
-    update();
+  }
+  
+  String getName(){
+    return getRotation()==0.0 ? (get("speed")==0? "Standing" : (get("dr")==0? "Straight " : "Crab ")+"Walk") : "Turn "+nf(degrees(getRotation()),1,2)+"°/s";
   }
   
   void update(boolean quick){
-    name = getRotation()==0.0 ? (get("speed")==0? "Standing" : (get("dr")==0? "Straight " : "Crab ")+"Walk") : "Turn "+nf(degrees(getRotation()),1,2)+"°/s";
     osc = new Oscillation(new PVector(0,0,0), new PVector(0,0,0)); // No oscillation to define the nominal trajectories of the legs (for turns)
     for(int i=0; i<4; i++){      // for each leg
       PVector foot_ref = legs[i].slot.copy().add(SCALE*get("shift_x"), SCALE*get("shift_y") + SCALE*get("dy") * legs[i].right(), -frame.getHeight());
@@ -217,7 +172,7 @@ class Walk extends Steady {
     return t[i].point(ph).add(osc.pointLin(phase));
   }
   
-  PVector getSpeed(){ return new PVector(SCALE*get("speed"), SCALE*get("speed")*tan(radians(get("dr"))), 0.0).add(osc.speed(phase).mult(1.0/getPeriod())); }
+  PVector getSpeed(){ return new PVector(SCALE*get("speed"), SCALE*get("speed")*tan(radians(get("dr"))), 0.0).add(osc.speed(PHASE).mult(1.0/getPeriod())); }
   
   float getRotation(){ return radians(get("rotation")); }
 }
@@ -230,126 +185,83 @@ class Stand extends Walk {
     parameters.get("speed").value = 0.0;
     parameters.get("dx").value = 0.0;    // dx set to zero so that the period = 1.0
     parameters.get("dz").value = 0.0;
-    update();
+    parameters.get("ampl_osc").value = 0.0;
   }
   
 }
 
+// TRANSIENT MOVES
+
+abstract class Transient extends Move {
+  
+  Steady move1, move2;
+  
+  Transient(Steady move1, Steady move2){
+    this.move1 = move1;
+    this.move2 = move2;
+  }
+    
+}
+
 class LinearTransient extends Transient {
-  
-  
-  int npoints;
-  float dp;
+    
   PVector[][][] alltrajectories;
   
   Move move;
-  float phase; // Only used to avoid redundant executions
+  float phase_ = -1.0;
   
-  LinearTransient(Steady move1, Steady move2, float phase1, float phase2, float duration){
-    super(move1, move2, phase1, phase2);
-    put(new Parameter("duration", duration, 1.0, 20.0));
-    println("Transient: "+phase1+" "+phase2);
-    this.name = "Transient";
+  LinearTransient(Steady move1, Steady move2){
+    super(move1, move2);
     try{
       move = move1.getClass().getDeclaredConstructor(Robot.this.getClass()).newInstance(Robot.this);
     }catch(Exception e){
       e.printStackTrace();
       println(move1.getClass().toString()+" must have a default constructor!");
     }
-    npoints = (int) (getPeriod() * FPS);
-    dp = 1.0 / npoints;
-    trajectories = getFeetTrajectories();
-    setParameters(0.0);
-    update(true);
   }
   
-  LinearTransient(Steady move1, Steady move2){
-    this(move1, move2, 1.0, 0.0, 5.0);
+  String getName(){
+    return move1.getName() + " > " + move2.getName();
   }
-    
+  
+  void update(boolean quick){
+    alltrajectories = new PVector[(int) duration][][];
+    setParameters(phase0);
+    for(float i=0; i<alltrajectories.length; i++)
+      alltrajectories[(int)i] = getFeetTrajectories(phase0+i);
+  }
+  
   void setParameters(float phase){
-    if(LinearTransient.this.phase != phase){
-      this.phase = phase;
+    if(this.phase_ != phase){
+      phase_ = phase;
+      float phase_in = (phase-phase0)/duration;
       for(Parameter p : move1.parameters.values())
-        move.parameters.get(p.name).value = phase(phase, p.value, move2.get(p.name));
-      move.update(true);
-      trajectories = alltrajectories[min(getNPeriod(phase),alltrajectories.length-1)]; //<>//
+        move.parameters.get(p.name).value = (1.0-phase_in) * p.value + phase_in * move2.get(p.name);
+      move.update(true); // Recompute move's trajectories
+      trajectories = alltrajectories[(int)(phase-phase0)]; //<>//
     }
   }
   
-  protected PVector[][] getFeetTrajectories(){
-    int nperiods = getNPeriod(1.0)+1, i=0;
-    alltrajectories = new PVector[nperiods][4][];
-    List<PVector[]> list = new ArrayList();
-    for(float p=0.0; i < nperiods; p+=dp){
-      PVector[] pts = new PVector[4];
-      for(int j=0; j<4; j++)
-        pts[j] = getFootPosition(j, p);
-      list.add(pts);
-      if(getNPeriod(p) > i){ //|| p+dp>1.0
-        for(int j=0; j<4; j++){
-          alltrajectories[i][j] = new PVector[list.size()];
-          for(int k=0; k<list.size(); k++){
-            alltrajectories[i][j][k] = list.get(k)[j];
-          }
-        }
-        i++;
-        list.clear();
-      }
-      //println(p+" "+getNPeriod(p)+" "+i+"/"+nperiods);
-    }
-    return alltrajectories[0];
-  }
-    
-  int getNPeriod(float phase){
-    float ip=0.0, ip_1=0.0;
-    int period = 0;
-    for(float p=0.0; p<=phase; p+=dp, ip_1 = ip){
-      ip = getInnerPhase(p) % 1.0;
-      if(ip < ip_1) period++;
-      //println(p+" "+ip+" "+period+" "+t1+" "+t2);
-    }
-    return period;
-  }
-  
-  float phase(float p, float v1, float v2){
-    return (1.0-min(p,1.0)) * v1 + min(p,1.0) * v2;
-  }
-  
-  float getInnerPeriod(float phase){
-    return phase(phase, t1, t2);
-  }
-  
-  float getInnerPhase(float phase){
-    if(t1==t2) return phase * get("duration") / t1;
-    if(phase<=1.0) return get("duration") / (t2-t1) * log( 1 + phase*(t2-t1)/t1 );
-    float p = get("duration") / (t2-t1) * log( 1 + (t2-t1)/t1 );  // Innerphase up to phase = 1
-    return p + (phase-1.0) * get("duration") / t2;  // Remainder where period is constant = t2
-  }
-  
-  float getPeriod(){
-    return get("duration");
+  float getPeriod(float phase){
+    setParameters(phase);
+    return move.getPeriod(phase);
   }
   
   PVector getSpeed(float phase){
     setParameters(phase);
-    return move.getSpeed(getInnerPhase(phase));
+    return move.getSpeed(phase);
   }
   
   float getRotation(float phase){
     setParameters(phase);
-    return move.getRotation(getInnerPhase(phase));
+    return move.getRotation(phase);
   }
   
   PVector getFootPosition(int i, float phase){
     setParameters(phase);
-    return move.getFootPosition(i, getInnerPhase(phase));
+    return move.getFootPosition(i, phase);
   }
-  
-  boolean finished(float phase){
-    return phase >= 1.0 && (getInnerPhase(phase) - phase2) % 1.0 <= dt / getInnerPeriod(phase);
-  }
-  
+    
 }
 
 

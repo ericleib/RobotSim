@@ -18,18 +18,21 @@ void setupCharts(){
   arduChart = makeArduinoChart();  // cf arduino tab
 }
 
-void createSliders(){
-  if(cp5!=null){
-    for(Controller c:sliders)
-      cp5.remove(c.getName());
-    sliders.clear();
+void removeSliders(){  
+  for(Controller c:sliders)
+    cp5.remove(c.getName());
+  sliders.clear();
+}
+
+void createSliders(Move move){
+  if(cp5!=null && sliders.size()==0){
     int i=0, j=0;  // Line & column of sliders
     for(Parameter p:move.parameters.values()){
       Controller c = cp5.addSlider(p.name, p.min, p.max, p.value, 170+j*350, 5+(i++)*17, 280, 15);
       c.getValueLabel().getStyle().margin(0,0,0,3);
       c.getCaptionLabel().getStyle().margin(0,0,0,3);
-      sliders.add(c);
       c.getCaptionLabel().setColor(0);
+      sliders.add(c);
       if(i==6){ j++; i=0;}
     }
   }
@@ -58,12 +61,12 @@ Chart makeChart(String name, int n, float min, float max){
 }
 
 void controlEvent(ControlEvent e) {
-  if(e.getName()=="pause") pause = !pause;
+  if(e.getName()=="pause") PAUSE = !PAUSE;
   if(e.getName()=="next" || e.getName()=="prev")
-    if(!pause)
-      pause = true;
+    if(!PAUSE)
+      PAUSE = true;
     else
-      time += (e.getName()=="next"? 1.0 : -1.0) / FPS;
-  if(e.getName()=="reset") reset = true;
-  if(e.getController() instanceof Slider) move.set(e.getName(), e.getValue());
+      TIME += (e.getName()=="next"? 1.0 : -1.0) / FPS;
+  if(e.getName()=="reset") RESET = true;
+  if(e.getController() instanceof Slider) MOVE.set(e.getName(), e.getValue());
 }
