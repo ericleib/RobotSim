@@ -28,9 +28,9 @@ void setupArduino() {
 void drawArduino(){
   
   if(arduino!=null){
-    int Ptheta = (int) interp(0, -45, 102.3, 48.7, legs[0].theta);
-    int Pphi = (int) interp(90, 45, 69.1, 121.8, legs[0].phi);
-    int Ppsi = (int) interp(90, 135, 102, 142.4, legs[0].psi);
+    int Ptheta = (int) interp(0, -45, 102.3, 48.7, ROBOT.legs[0].theta);
+    int Pphi = (int) interp(90, 45, 69.1, 121.8, ROBOT.legs[0].phi);
+    int Ppsi = (int) interp(90, 135, 102, 142.4, ROBOT.legs[0].psi);
     
     arduino.servoWrite(CONTACT, constrain(Ppsi, 0, 180));
     arduino.servoWrite(PENDULUM, constrain(Pphi, 0, 180));
@@ -43,7 +43,7 @@ float interp(float x1, float x2, float y1, float y2, float x){
   return y1 + (x - x1) * (y2 - y1) / (x2 - x1);
 }
 
-Chart makeArduinoChart(){
+Chart makeArduinoChart(ControlP5 cp5){
   return cp5.addChart("Arduino")
                .setPosition(3,45)
                .setSize(160, 60)

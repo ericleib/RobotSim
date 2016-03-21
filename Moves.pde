@@ -12,6 +12,12 @@ class MovePlanner {
   
   void addMove(Move move){ addMove(move, 0.0); }
   
+  void addMoveWithTransient(Steady move, float transientDuration, float duration){
+    Steady last = (Steady) moves.get(moves.size()-1);
+    addMove(new LinearTransient(last, move), transientDuration);
+    addMove(move, duration);
+  }
+  
   Move getMove(float phase){  // Moves are retrieved in function of phase
     Move move = moves.get(0);
     for(Move m : moves){
@@ -20,9 +26,9 @@ class MovePlanner {
       move = m;
     }
     if(move == moves.get(moves.size()-1))
-      createSliders(move);    // Sliders are added only for the last move
+      UI.createSliders(move);    // Sliders are added only for the last move
     else
-      removeSliders();
+      UI.removeSliders();
     return move;
   }
 }
@@ -53,8 +59,18 @@ abstract class Move {
     update(false);
   }
   
+  void apply(float phase){
+    for(int i=0; i<4; i++){  // For each leg
+      ROBOT.legs[i].foot = getFootPosition(i, phase);  // Trajectory planning
+      ROBOT.legs[i].footTrajectory = MOVE.trajectories[i]; 
+      ROBOT.legs[i].resolve();  // Inverse kinematics & CG
+    }
+    ROBOT.resolve();  // Compute CG and stability triangles
+    ROBOT.ground.resolve(this, phase, TIME.dt);  // Compute ground position variation 
+  }
+  
   protected PVector[][] getFeetTrajectories(float phase){
-    int npoints = min((int) (FPS * getPeriod(phase)), 200);
+    int npoints = min((int) (TIME.fps * getPeriod(phase)), 200);
     PVector[][] pts = new PVector[4][npoints];
     for(int i=0; i<4; i++)
       for(float j=0; j<npoints; j++)
@@ -79,7 +95,7 @@ abstract class Move {
   }
   
   PVector getSpeed(float phase, PVector point){
-    return getSpeed(phase).add(frame.frameCG.copy().sub(point).cross(new PVector(0,0,getRotation(phase))));  // Speed of the point = Speed(CG) + point->cg ^ Rotation
+    return getSpeed(phase).add(ROBOT.ref.copy().sub(point).cross(new PVector(0,0,getRotation(phase))));  // Speed of the point = Speed(CG) + point->cg ^ Rotation
   }
   
   void set(String name, float value){
@@ -90,7 +106,7 @@ abstract class Move {
   float get(String name){
     return parameters.get(name).value;
   }
-  
+    
   void put(Parameter p){
     parameters.put(p.name, p);
   }
@@ -151,14 +167,15 @@ class Walk extends Steady {
   void update(boolean quick){
     osc = new Oscillation(new PVector(0,0,0), new PVector(0,0,0)); // No oscillation to define the nominal trajectories of the legs (for turns)
     for(int i=0; i<4; i++){      // for each leg
-      PVector foot_ref = legs[i].slot.copy().add(SCALE*get("shift_x"), SCALE*get("shift_y") + SCALE*get("dy") * legs[i].right(), -frame.getHeight());
+      Leg leg = ROBOT.legs[i];
+      PVector foot_ref = leg.slot.copy().add(get("shift_x"), get("shift_y") + get("dy") * leg.right(), -ROBOT.height);
       PVector v = getSpeed(foot_ref);  // Local speed of the leg : Problem: this includes the oscillations...
-      float dx = SCALE*get("dx") * (getRotation()==0.0 ? 1.0 : v.x / (SCALE*get("speed")));
+      float dx = get("dx") * (getRotation()==0.0 ? 1.0 : v.x / (get("speed")));
       float dr = getRotation()==0.0 ? radians(get("dr")) : atan(v.y/v.x); // warning: some particular cases where rotation!=0 and v.x = 0
       //println(dx+" "+dy+" "+degrees(dr)+" "+get("dz")+" "+k);
-      t[i] = makeStep(foot_ref, dx, dr, SCALE*get("dz"), get("k_ground"));  // Left forward //<>//
+      t[i] = makeStep(foot_ref, dx, dr, get("dz"), get("k_ground"));  // Left forward //<>//
     }
-    osc = new Oscillation(new PVector(0,-SCALE*get("ampl_osc"),0), new PVector(0,SCALE*get("ampl_osc"),0), get("phase_osc"), 1.0);  // Now we add oscillations
+    osc = new Oscillation(new PVector(0,-get("ampl_osc"),0), new PVector(0,get("ampl_osc"),0), get("phase_osc"), 1.0);  // Now we add oscillations
     super.update(quick);
   }
   
@@ -172,7 +189,7 @@ class Walk extends Steady {
     return t[i].point(ph).add(osc.pointLin(phase));
   }
   
-  PVector getSpeed(){ return new PVector(SCALE*get("speed"), SCALE*get("speed")*tan(radians(get("dr"))), 0.0).add(osc.speed(PHASE).mult(1.0/getPeriod())); }
+  PVector getSpeed(){ return new PVector(get("speed"), get("speed")*tan(radians(get("dr"))), 0.0).add(osc.speed(TIME.phase).mult(1.0/getPeriod())); }
   
   float getRotation(){ return radians(get("rotation")); }
 }
