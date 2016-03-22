@@ -2,6 +2,7 @@
 class MovePlanner {
   
   List<Move> moves = new ArrayList();   // List of planned moves
+  Move move;
   
   void addMove(Move move, float duration) {  // Moves are added at the beginning
     move.duration = duration;
@@ -19,7 +20,7 @@ class MovePlanner {
   }
   
   Move getMove(float phase){  // Moves are retrieved in function of phase
-    Move move = moves.get(0);
+    move = moves.get(0);
     for(Move m : moves){
       if(m.phase0 > phase)
         break;
@@ -62,7 +63,7 @@ abstract class Move {
   void apply(float phase){
     for(int i=0; i<4; i++){  // For each leg
       ROBOT.legs[i].foot = getFootPosition(i, phase);  // Trajectory planning
-      ROBOT.legs[i].footTrajectory = MOVE.trajectories[i]; 
+      ROBOT.legs[i].footTrajectory = trajectories[i]; 
       ROBOT.legs[i].resolve();  // Inverse kinematics & CG
     }
     ROBOT.resolve();  // Compute CG and stability triangles
@@ -78,15 +79,13 @@ abstract class Move {
     return pts;
   }
   
-  Trajectory makeStep(PVector foot, float dx, float dr, float h, float k){
+  Trajectory makeStep(PVector foot, float dx, float dr, float dz, float k){
     Trajectory t = new Trajectory();
-    if(dx!=0){
+    if(dx!=0 || dz!=0){
       float dy = dx * tan(dr);
-      float dyh = dy * h / dx;
       t.addSegment(foot.copy().add(dx, dy, 0),     foot.copy().add(-dx, -dy, 0));
-      t.addSegment(foot.copy().add(-dx, -dy, 0.0), foot.copy().add(-dx, -dy, h),     foot.copy().add(-h, - dyh, h),    foot.copy().add(0, 0, h));
-      t.addSegment(foot.copy().add(0, 0, h),       foot.copy().add(dx, dy, h));
-      t.addSegment(foot.copy().add(dx, dy, h),     foot.copy().add(dx+h, dy+dyh, h), foot.copy().add(dx+h, dy+dyh, 0), foot.copy().add(dx, dy, 0));
+      t.addSegment(foot.copy().add(-dx, -dy, 0.0), foot.copy().add(-dx, -dy, dz), foot.copy().add(0, 0, dz));
+      t.addSegment(foot.copy().add(0, 0, dz),      foot.copy().add(dx, dy, dz),   foot.copy().add(dx, dy, 0));
     }else{
       t.addSegment(foot);
     }
@@ -242,7 +241,7 @@ class LinearTransient extends Transient {
   }
   
   void update(boolean quick){
-    alltrajectories = new PVector[(int) duration][][];
+    alltrajectories = new PVector[(int) ceil(duration)][][];
     setParameters(phase0);
     for(float i=0; i<alltrajectories.length; i++)
       alltrajectories[(int)i] = getFeetTrajectories(phase0+i);
@@ -254,7 +253,7 @@ class LinearTransient extends Transient {
       float phase_in = (phase-phase0)/duration;
       for(Parameter p : move1.parameters.values())
         move.parameters.get(p.name).value = (1.0-phase_in) * p.value + phase_in * move2.get(p.name);
-      move.update(true); // Recompute move's trajectories
+      move.update(true); // Recompute move's trajectory
       trajectories = alltrajectories[(int)(phase-phase0)]; //<>//
     }
   }
@@ -279,6 +278,31 @@ class LinearTransient extends Transient {
     return move.getFootPosition(i, phase);
   }
     
+}
+
+
+class PilotedMove extends LinearTransient {
+  
+  PilotedMove(){
+    super(new Walk(), new Walk());
+    parameters.putAll(move1.parameters);
+  }
+  
+  String getName(){
+    return "Piloted move";
+  }
+  
+  void setParameters(float phase){
+    super.setParameters(min(phase, phase0 + duration - 0.001));
+  }
+  
+  void set(String name, float value){
+    for(Parameter p:parameters.values())
+      move1.parameters.get(p.name).value = move.get(p.name);
+    move2.parameters.get(name).value = value;
+    phase0 = TIME.phase;
+    update();
+  }
 }
 
 

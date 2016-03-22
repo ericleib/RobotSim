@@ -3,7 +3,7 @@
 
 class MyRobot extends Drawable {
 
-  float width = 43.75, length = 127.75, height = 80.0, thick = 5.0;
+  float width = 43.75, length = 127.75, height = 95.0, thick = 5.0;
   float shoulderWidth = 25.0, upperLegLength = 53.0, lowerLegLength = 53.0;
 
   PVector ref;  // Reference point for speed
@@ -264,13 +264,14 @@ class Frame extends Drawable {
     v.fill(255, 255, 255, 128);    
     v.rect(corner1, corner2);
     v.line(l1, l2);
-    v.line(l1.add(ROBOT.length, 0, 0), l2.add(ROBOT.length, 0, 0));    
+    v.line(l1.copy().add(ROBOT.length, 0, 0), l2.copy().add(ROBOT.length, 0, 0));    
     v.noFill();
 
     v.stroke(100);
     v.cg(ROBOT.ref);
   }
 }
+
 
 // GROUND class (for visualization)
 
@@ -288,7 +289,6 @@ class Ground extends Drawable {
     speed_grid = move.getSpeed(phase, grid_point);
     angle = ((angle + rotation * dt) % HALF_PI + HALF_PI) % HALF_PI;
     grid_point.add(-speed_grid.x * dt, -speed_grid.y * dt);
-    println(angle);
   }  
 
   void draw(View v) {

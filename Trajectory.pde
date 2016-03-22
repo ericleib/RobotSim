@@ -14,7 +14,7 @@ class Trajectory {
   }
   
   void addSegment(PVector p1, PVector cp, PVector p2){
-    addSegment(p1, cp, cp, p2);
+    addSegment(new Bezier2(p1, cp, p2));
   }
   
   void addSegment(PVector p1, PVector p2){
@@ -34,6 +34,9 @@ class Trajectory {
   void setGroundRatio(float k){
     if(length==0){
       segments.get(0).phase = 1.0;    // Case of degenerate trajectory
+    }else if(length_grd==0){
+      for(Segment s : segments)  // Set the phase for each segment, in function of the ratio (speed is assumed constant on respectively air and ground)
+        s.phase = s.ground? k : (1 - k) * s.length / length;
     }else{
       for(Segment s : segments)  // Set the phase for each segment, in function of the ratio (speed is assumed constant on respectively air and ground)
         s.phase = s.length * (s.ground? k / length_grd : (1 - k) / (length - length_grd));
@@ -96,20 +99,19 @@ class Line extends Segment {
   }
 }
 
-class Bezier extends Segment {
+class Bezier2 extends Segment {
   
-  final int STEPS = 100;   // Steps to discretize the curve
-  
-  PVector p1, v1, v2, v3;
+  final int STEPS = 10;   // Steps to discretize the curve
+  PVector p1, v1, v2, cp;
   float[] lengths = new float[STEPS+1];
   
-  Bezier(PVector p1, PVector cp1, PVector cp2, PVector p2){
+  Bezier2(PVector p1, PVector cp, PVector p2){
     this.p1 = p1;
-    v1 = p1.copy().mult(-1).add(cp1.copy().mult(3)).add(cp2.copy().mult(-3)).add(p2);
-    v2 = p1.copy().mult(3).add(cp1.copy().mult(-6)).add(cp2.copy().mult(3));
-    v3 = p1.copy().mult(-3).add(cp1.copy().mult(3));
+    this.cp = cp;
+    v1 = p1.copy().mult(2).add(cp.copy().mult(-4)).add(p2.copy().mult(2));
+    v2 = p1.copy().mult(-2).add(cp.copy().mult(2));
     length = length();
-    ground = p1.z == 0.0 && p2.z == 0.0 && cp1.z == 0.0 && cp2.z == 0.0;
+    ground = p1.z == 0.0 && p2.z == 0.0 && cp.z == 0.0;
   }
   
   float length(){ 
@@ -118,12 +120,13 @@ class Bezier extends Segment {
     return lengths[STEPS];
   }
   
+  
   PVector point(float t){
-    return v1.copy().mult(t*t*t).add(v2.copy().mult(t*t)).add(v3.copy().mult(t)).add(p1);
+    return v1.copy().mult(0.5*t*t).add(v2.copy().mult(t)).add(p1);
   }
   
   PVector dpoint(float t){
-    return v1.copy().mult(3*t*t).add(v2.copy().mult(2*t)).add(v3);
+    return v1.copy().mult(t).add(v2);
   }
   
   PVector pointLin(float t){
@@ -136,6 +139,27 @@ class Bezier extends Segment {
       i = - i - 2; // insertion point
       return point( (i + (l-lengths[i])/(lengths[i+1]-lengths[i])) / STEPS );  // Interpolate in the bezier
     }   
+  }
+}
+
+class Bezier extends Bezier2 {
+      
+  Bezier(PVector p1, PVector cp1, PVector cp2, PVector p2){
+    super(p1, cp1, p2);
+    v1 = p1.copy().mult(-1).add(cp1.copy().mult(3)).add(cp2.copy().mult(-3)).add(p2);
+    v2 = p1.copy().mult(3).add(cp1.copy().mult(-6)).add(cp2.copy().mult(3));
+    length = length();
+    ground = p1.z == 0.0 && p2.z == 0.0 && cp1.z == 0.0 && cp2.z == 0.0;
+  }
+    
+  PVector point(float t){
+    PVector v3 = p1.copy().mult(-3).add(cp.copy().mult(3));
+    return v1.copy().mult(t*t*t).add(v2.copy().mult(t*t)).add(v3.copy().mult(t)).add(p1);
+  }
+  
+  PVector dpoint(float t){
+    PVector v3 = p1.copy().mult(-3).add(cp.copy().mult(3));
+    return v1.copy().mult(3*t*t).add(v2.copy().mult(2*t)).add(v3);
   }
 }
 

@@ -14,9 +14,6 @@ class Time {
   }
   
   void update(float period){
-    fill(0);
-    text(nf(time,1,2)+" sec", 3, 15);
-    text(MOVE.getName(), 80, 15);
     if(!pause)
       time += 1.0 / fps; 
     dt = time-time_1;

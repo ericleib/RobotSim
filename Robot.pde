@@ -2,7 +2,6 @@
 // Global variables
 MyRobot ROBOT;
 MovePlanner PLANNER;
-Move MOVE;
 Time TIME;
 Views UI;
 
@@ -10,7 +9,7 @@ Views UI;
 void setup() {
   size(1280, 850);
   surface.setResizable(true);
-  
+    
   TIME = new Time(50);  
   
   ROBOT = new MyRobot();
@@ -22,15 +21,15 @@ void setup() {
   //setupArduino();
 }
 
-// Drawing method (called every iteration)
+// Drawing method (called every step)
 void draw() {  
-  MOVE = PLANNER.getMove(TIME.phase);    // Sets the current move
+  Move move = PLANNER.getMove(TIME.phase); // Sets the current move
   
-  MOVE.apply(TIME.phase);
+  move.apply(TIME.phase);
   
-  UI.draw(); // Draw the views
+  UI.draw(move); // Draw the views
         
-  TIME.update(MOVE.getPeriod(TIME.phase)); // Update the time, and display it
+  TIME.update(move.getPeriod(TIME.phase)); // Update the time
 }
 
 
@@ -42,14 +41,18 @@ void initPlanner(){
   // Uncomment for a constant move
   //PLANNER.addMove(new Walk());
   
+  // Test: piloted walk
+  PLANNER.addMove(new PilotedMove(), 2.5);
+  
   // Uncomment for a move sequence
+  /*
   Walk stand = new Stand();
   PLANNER.addMove(stand, 3.0);
   
   Walk walk = new Walk();
   walk.set("dx", 30);
   walk.set("speed", 40);
-  PLANNER.addMoveWithTransient(walk, 3.0,5.0);
+  PLANNER.addMoveWithTransient(walk, 2.5,5.0);
   
   Walk walk_crab = new Walk( 0.0, 25.0);
   walk_crab.set("dx", 30);
@@ -74,5 +77,5 @@ void initPlanner(){
   
   Walk stand2 = new Stand();
   PLANNER.addMoveWithTransient(stand2, 5.0, 0.0);
-  
+  */
 }

@@ -23,12 +23,14 @@ class Views {
     psiChart = makeChart("psi", 1, 0, 180);
     thetaChart = makeChart("theta", 2, -90, 90);
     
-    arduChart = makeArduinoChart(cp5);  // cf arduino tab
-    
+    arduChart = makeArduinoChart(cp5);  // cf arduino tab    
   }
   
-  void draw(){
+  void draw(Move move){
     background(240);   // background color
+    fill(0);
+    text(nf(TIME.time,1,2)+" sec", 3, 15);
+    text(move.getName(), 80, 15);
     TOP.draw();
     SIDE.draw();
     FRONT.draw(); 
@@ -78,7 +80,7 @@ class Views {
 
 void controlEvent(ControlEvent e) {
   TIME.event(e);
-  if(e.getController() instanceof Slider) MOVE.set(e.getName(), e.getValue());
+  if(e.getController() instanceof Slider) PLANNER.move.set(e.getName(), e.getValue());
 }
 
 List<Drawable> OBJECTS = new ArrayList();
