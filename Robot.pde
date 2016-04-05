@@ -17,7 +17,7 @@ void setup() {
   UI = new Views(3.0);
   
   initPlanner();
-     
+  
   //setupArduino();
 }
 
@@ -25,9 +25,9 @@ void setup() {
 void draw() {  
   Move move = PLANNER.getMove(TIME.phase); // Sets the current move
   
-  move.apply(TIME.phase);
+  ROBOT.apply(move, TIME.phase);
   
-  UI.draw(move); // Draw the views
+  UI.draw(move.getName()); // Draw the views
         
   TIME.update(move.getPeriod(TIME.phase)); // Update the time
 }

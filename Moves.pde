@@ -13,8 +13,8 @@ class MovePlanner {
   
   void addMove(Move move){ addMove(move, 0.0); }
   
-  void addMoveWithTransient(Steady move, float transientDuration, float duration){
-    Steady last = (Steady) moves.get(moves.size()-1);
+  void addMoveWithTransient(Move move, float transientDuration, float duration){
+    Move last = moves.get(moves.size()-1);
     addMove(new LinearTransient(last, move), transientDuration);
     addMove(move, duration);
   }
@@ -49,6 +49,12 @@ abstract class Move {
   
   abstract float getRotation(float phase);
   
+  abstract float getHeight(float phase);
+  
+  abstract float getPitch(float phase);
+  
+  abstract float getRoll(float phase);
+  
   abstract PVector getFootPosition(int i, float phase);
     
   void update(boolean quick){
@@ -59,17 +65,7 @@ abstract class Move {
   void update(){
     update(false);
   }
-  
-  void apply(float phase){
-    for(int i=0; i<4; i++){  // For each leg
-      ROBOT.legs[i].foot = getFootPosition(i, phase);  // Trajectory planning
-      ROBOT.legs[i].footTrajectory = trajectories[i]; 
-      ROBOT.legs[i].resolve();  // Inverse kinematics & CG
-    }
-    ROBOT.resolve();  // Compute CG and stability triangles
-    ROBOT.ground.resolve(this, phase, TIME.dt);  // Compute ground position variation 
-  }
-  
+    
   protected PVector[][] getFeetTrajectories(float phase){
     int npoints = min((int) (TIME.fps * getPeriod(phase)), 200);
     PVector[][] pts = new PVector[4][npoints];
@@ -83,18 +79,18 @@ abstract class Move {
     Trajectory t = new Trajectory();
     if(dx!=0 || dz!=0){
       float dy = dx * tan(dr);
-      t.addSegment(foot.copy().add(dx, dy, 0),     foot.copy().add(-dx, -dy, 0));
-      t.addSegment(foot.copy().add(-dx, -dy, 0.0), foot.copy().add(-dx, -dy, dz), foot.copy().add(0, 0, dz));
-      t.addSegment(foot.copy().add(0, 0, dz),      foot.copy().add(dx, dy, dz),   foot.copy().add(dx, dy, 0));
+      t.addSegment(foot.copy().add(dx, dy, 0),     foot.copy().add(-dx, -dy, 0), true);
+      t.addSegment(foot.copy().add(-dx, -dy, 0.0), foot.copy().add(-dx, -dy, dz), foot.copy().add(0, 0, dz), false);
+      t.addSegment(foot.copy().add(0, 0, dz),      foot.copy().add(dx, dy, dz),   foot.copy().add(dx, dy, 0), false);
     }else{
-      t.addSegment(foot);
+      t.addSegment(foot, true);
     }
     t.setGroundRatio(k);
     return t;
   }
   
   PVector getSpeed(float phase, PVector point){
-    return getSpeed(phase).add(ROBOT.ref.copy().sub(point).cross(new PVector(0,0,getRotation(phase))));  // Speed of the point = Speed(CG) + point->cg ^ Rotation
+    return getSpeed(phase).add(ROBOT.frame.ref.copy().sub(point).cross(new PVector(0,0,getRotation(phase))));  // Speed of the point = Speed(CG) + point->cg ^ Rotation
   }
   
   void set(String name, float value){
@@ -114,25 +110,7 @@ abstract class Move {
 
 // STEADY MOVES
 
-abstract class Steady extends Move {
-  
-  abstract float getPeriod();
-  
-  abstract PVector getSpeed();
-  
-  abstract float getRotation();
-  
-  float getPeriod(float phase){ return getPeriod();}
-  
-  PVector getSpeed(PVector point){ return getSpeed(0.0, point); }  // Speed of the point = Speed(CG) + point->cg ^ Rotation
-  
-  PVector getSpeed(float phase){ return getSpeed();}
-  
-  float getRotation(float phase){ return getRotation();}
-  
-}
-
-class Walk extends Steady {
+class Walk extends Move {
   
   Trajectory[] t = new Trajectory[4];
   Oscillation osc;
@@ -145,12 +123,15 @@ class Walk extends Steady {
     put(new Parameter("speed", 20.0, 0.0, 100.0));
     put(new Parameter("shift_x", -2.0, -20.0, 20.0));
     put(new Parameter("shift_y", 0.0, -20.0, 20.0));
+    put(new Parameter("height", 85.0, 10.0, 100.0)); 
     put(new Parameter("dx", 40.0, 0.0, 50.0));
     put(new Parameter("dy", 25.0, 0.0, 50.0));
     put(new Parameter("dz", 10.0, 0.0, 50.0));
     put(new Parameter("dr", dr, 0.0, 60.0));
     put(new Parameter("k_ground", 0.8, 0.0, 1.0));
     put(new Parameter("rotation", rotation, 0.0, 10.0));
+    put(new Parameter("pitch", 0.0, -20.0, 20.0)); 
+    put(new Parameter("roll", 0.0, -20.0, 20.0)); 
     put(new Parameter("phase1", 0.25, 0, 1.0));
     put(new Parameter("phase2", 0.00, 0, 1.0));
     put(new Parameter("phase3", 0.75, 0, 1.0));
@@ -160,17 +141,16 @@ class Walk extends Steady {
   }
   
   String getName(){
-    return getRotation()==0.0 ? (get("speed")==0? "Standing" : (get("dr")==0? "Straight " : "Crab ")+"Walk") : "Turn "+nf(degrees(getRotation()),1,2)+"°/s";
+    return getRotation(phase0)==0.0 ? (get("speed")==0? "Standing" : (get("dr")==0? "Straight " : "Crab ")+"Walk") : "Turn "+nf(degrees(getRotation(phase0)),1,2)+"°/s";
   }
   
   void update(boolean quick){
     osc = new Oscillation(new PVector(0,0,0), new PVector(0,0,0)); // No oscillation to define the nominal trajectories of the legs (for turns)
     for(int i=0; i<4; i++){      // for each leg
-      Leg leg = ROBOT.legs[i];
-      PVector foot_ref = leg.slot.copy().add(get("shift_x"), get("shift_y") + get("dy") * leg.right(), -ROBOT.height);
-      PVector v = getSpeed(foot_ref);  // Local speed of the leg : Problem: this includes the oscillations...
-      float dx = get("dx") * (getRotation()==0.0 ? 1.0 : v.x / (get("speed")));
-      float dr = getRotation()==0.0 ? radians(get("dr")) : atan(v.y/v.x); // warning: some particular cases where rotation!=0 and v.x = 0
+      PVector foot_ref = ROBOT.legs[i].foot_ref.copy().add(get("shift_x"), get("shift_y") + get("dy") * ROBOT.legs[i].right());
+      PVector v = getSpeed(phase0, foot_ref);  // Local speed of the leg : Problem: this includes the oscillations...
+      float dx = get("dx") * (getRotation(phase0)==0.0 ? 1.0 : v.x / (get("speed")));
+      float dr = getRotation(phase0)==0.0 ? radians(get("dr")) : atan(v.y/v.x); // warning: some particular cases where rotation!=0 and v.x = 0
       //println(dx+" "+dy+" "+degrees(dr)+" "+get("dz")+" "+k);
       t[i] = makeStep(foot_ref, dx, dr, get("dz"), get("k_ground"));  // Left forward //<>//
     }
@@ -178,7 +158,7 @@ class Walk extends Steady {
     super.update(quick);
   }
   
-  float getPeriod(){  // Period of the movement
+  float getPeriod(float p){  // Period of the movement
     if(get("dx")==0.0) return 1.0; // Case of degenerate trajectory
     return get("dx") / (0.5 * get("k_ground") * get("speed"));
   }
@@ -188,9 +168,16 @@ class Walk extends Steady {
     return t[i].point(ph).add(osc.pointLin(phase));
   }
   
-  PVector getSpeed(){ return new PVector(get("speed"), get("speed")*tan(radians(get("dr"))), 0.0).add(osc.speed(TIME.phase).mult(1.0/getPeriod())); }
+  PVector getSpeed(float p){ return new PVector(get("speed"), get("speed")*tan(radians(get("dr"))), 0.0).add(osc.speed(p).mult(1.0/getPeriod(p))); }
   
-  float getRotation(){ return radians(get("rotation")); }
+  float getRotation(float p){ return radians(get("rotation")); }
+  
+  float getHeight(float p){ return get("height"); }
+  
+  float getPitch(float p){ return radians(get("pitch")); }
+  
+  float getRoll(float p){ return radians(get("roll")); }
+  
 }
 
 
@@ -208,26 +195,17 @@ class Stand extends Walk {
 
 // TRANSIENT MOVES
 
-abstract class Transient extends Move {
-  
-  Steady move1, move2;
-  
-  Transient(Steady move1, Steady move2){
-    this.move1 = move1;
-    this.move2 = move2;
-  }
-    
-}
-
-class LinearTransient extends Transient {
+class LinearTransient extends Move {
     
   PVector[][][] alltrajectories;
   
+  Move move1, move2;
   Move move;
   float phase_ = -1.0;
   
-  LinearTransient(Steady move1, Steady move2){
-    super(move1, move2);
+  LinearTransient(Move move1, Move move2){
+    this.move1 = move1;
+    this.move2 = move2;
     try{
       move = move1.getClass().getDeclaredConstructor(Robot.this.getClass()).newInstance(Robot.this);
     }catch(Exception e){
@@ -271,6 +249,21 @@ class LinearTransient extends Transient {
   float getRotation(float phase){
     setParameters(phase);
     return move.getRotation(phase);
+  }
+  
+  float getHeight(float phase){
+    setParameters(phase);
+    return move.getHeight(phase);
+  }
+  
+  float getPitch(float phase){
+    setParameters(phase);
+    return move.getPitch(phase);
+  }
+  
+  float getRoll(float phase){
+    setParameters(phase);
+    return move.getRoll(phase);
   }
   
   PVector getFootPosition(int i, float phase){

@@ -9,9 +9,9 @@ class Views {
   List<Controller> sliders = new ArrayList();
 
   Views(float scale){
-    TOP = new View(2, 120, 150, 120, 300 + scale*ROBOT.length, 240 + scale*ROBOT.width, scale);
-    SIDE = new View(2, TOP.y+TOP.h-1, TOP.offset_x, TOP.offset_y*0.4+scale*ROBOT.height, TOP.w, TOP.offset_y * 0.7 + scale*ROBOT.height, scale);
-    FRONT = new View(TOP.x+TOP.w-1, SIDE.y, TOP.offset_x, SIDE.offset_y, 2*TOP.offset_x + scale*ROBOT.width, SIDE.h, scale);
+    TOP = new View(2, 120, 150, 120, 300 + scale*ROBOT.frame.length_, 240 + scale*ROBOT.frame.width_, scale);
+    SIDE = new View(2, TOP.y+TOP.h-1, TOP.offset_x, TOP.offset_y*0.4+scale*85, TOP.w, TOP.offset_y * 0.7 + scale*85, scale);
+    FRONT = new View(TOP.x+TOP.w-1, SIDE.y, TOP.offset_x, SIDE.offset_y, 2*TOP.offset_x + scale*ROBOT.frame.width_, SIDE.h, scale);
     
     cp5 = new ControlP5(Robot.this);  
     cp5.addButton("prev").setPosition(3,22).setSize(38,15);
@@ -26,11 +26,11 @@ class Views {
     arduChart = makeArduinoChart(cp5);  // cf arduino tab    
   }
   
-  void draw(Move move){
+  void draw(String name){
     background(240);   // background color
     fill(0);
     text(nf(TIME.time,1,2)+" sec", 3, 15);
-    text(move.getName(), 80, 15);
+    text(name, 80, 15);
     TOP.draw();
     SIDE.draw();
     FRONT.draw(); 

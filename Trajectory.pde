@@ -9,20 +9,20 @@ class Trajectory {
   List<Segment> segments = new ArrayList();
   float length_grd, length;
   
-  void addSegment(PVector p1, PVector cp1, PVector cp2, PVector p2){
-    addSegment(new Bezier(p1, cp1, cp2, p2));
+  void addSegment(PVector p1, PVector cp1, PVector cp2, PVector p2, boolean ground){
+    addSegment(new Bezier(p1, cp1, cp2, p2, ground));
   }
   
-  void addSegment(PVector p1, PVector cp, PVector p2){
-    addSegment(new Bezier2(p1, cp, p2));
+  void addSegment(PVector p1, PVector cp, PVector p2, boolean ground){
+    addSegment(new Bezier2(p1, cp, p2, ground));
   }
   
-  void addSegment(PVector p1, PVector p2){
-    addSegment(new Line(p1,p2));
+  void addSegment(PVector p1, PVector p2, boolean ground){
+    addSegment(new Line(p1, p2, ground));
   }
   
-  void addSegment(PVector p1){
-    addSegment(new Point(p1));
+  void addSegment(PVector p1, boolean ground){
+    addSegment(new Point(p1, ground));
   }
   
   void addSegment(Segment s){
@@ -72,10 +72,10 @@ abstract class Segment {
 class Point extends Segment {
   PVector p;
   
-  Point(PVector p){
+  Point(PVector p, boolean ground){
     this.p = p;
     length = 0.0;
-    ground = p.z==0;
+    this.ground = ground;
   }
   
   PVector pointLin(float t){
@@ -87,11 +87,11 @@ class Line extends Segment {
   
   PVector v1, v2;
   
-  Line(PVector v1, PVector v2){
+  Line(PVector v1, PVector v2, boolean ground){
     this.v1 = v1;
     this.v2 = v2;
     length = v1.dist(v2);
-    ground = v1.z == 0.0 && v2.z == 0.0;
+    this.ground = ground;
   }
   
   PVector pointLin(float t){
@@ -105,13 +105,13 @@ class Bezier2 extends Segment {
   PVector p1, v1, v2, cp;
   float[] lengths = new float[STEPS+1];
   
-  Bezier2(PVector p1, PVector cp, PVector p2){
+  Bezier2(PVector p1, PVector cp, PVector p2, boolean ground){
     this.p1 = p1;
     this.cp = cp;
     v1 = p1.copy().mult(2).add(cp.copy().mult(-4)).add(p2.copy().mult(2));
     v2 = p1.copy().mult(-2).add(cp.copy().mult(2));
     length = length();
-    ground = p1.z == 0.0 && p2.z == 0.0 && cp.z == 0.0;
+    this.ground = ground;
   }
   
   float length(){ 
@@ -144,8 +144,8 @@ class Bezier2 extends Segment {
 
 class Bezier extends Bezier2 {
       
-  Bezier(PVector p1, PVector cp1, PVector cp2, PVector p2){
-    super(p1, cp1, p2);
+  Bezier(PVector p1, PVector cp1, PVector cp2, PVector p2, boolean ground){
+    super(p1, cp1, p2, ground);
     v1 = p1.copy().mult(-1).add(cp1.copy().mult(3)).add(cp2.copy().mult(-3)).add(p2);
     v2 = p1.copy().mult(3).add(cp1.copy().mult(-6)).add(cp2.copy().mult(3));
     length = length();
