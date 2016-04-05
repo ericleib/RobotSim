@@ -15,7 +15,7 @@ class MovePlanner {
   
   void addMoveWithTransient(Move move, float transientDuration, float duration){
     Move last = moves.get(moves.size()-1);
-    addMove(new LinearTransient(last, move), transientDuration);
+    addMove(new WalkTransient(last, move), transientDuration);
     addMove(move, duration);
   }
   
@@ -141,16 +141,16 @@ class Walk extends Move {
   }
   
   String getName(){
-    return getRotation(phase0)==0.0 ? (get("speed")==0? "Standing" : (get("dr")==0? "Straight " : "Crab ")+"Walk") : "Turn "+nf(degrees(getRotation(phase0)),1,2)+"°/s";
+    return get("rotation")==0.0 ? (get("speed")==0? "Standing" : (get("dr")==0? "Straight " : "Crab ")+"Walk") : "Turn "+nf(get("rotation"),1,2)+"°/s";
   }
   
   void update(boolean quick){
     osc = new Oscillation(new PVector(0,0,0), new PVector(0,0,0)); // No oscillation to define the nominal trajectories of the legs (for turns)
     for(int i=0; i<4; i++){      // for each leg
       PVector foot_ref = ROBOT.legs[i].foot_ref.copy().add(get("shift_x"), get("shift_y") + get("dy") * ROBOT.legs[i].right());
-      PVector v = getSpeed(phase0, foot_ref);  // Local speed of the leg : Problem: this includes the oscillations...
-      float dx = get("dx") * (getRotation(phase0)==0.0 ? 1.0 : v.x / (get("speed")));
-      float dr = getRotation(phase0)==0.0 ? radians(get("dr")) : atan(v.y/v.x); // warning: some particular cases where rotation!=0 and v.x = 0
+      PVector v = getSpeed(foot_ref);  // Local speed of the leg : Problem: this includes the oscillations...
+      float dx = get("dx") * (get("rotation")==0.0 ? 1.0 : v.x / (get("speed")));
+      float dr = get("rotation")==0.0 ? radians(get("dr")) : atan(v.y/v.x); // warning: some particular cases where rotation!=0 and v.x = 0
       //println(dx+" "+dy+" "+degrees(dr)+" "+get("dz")+" "+k);
       t[i] = makeStep(foot_ref, dx, dr, get("dz"), get("k_ground"));  // Left forward //<>//
     }
@@ -168,7 +168,15 @@ class Walk extends Move {
     return t[i].point(ph).add(osc.pointLin(phase));
   }
   
-  PVector getSpeed(float p){ return new PVector(get("speed"), get("speed")*tan(radians(get("dr"))), 0.0).add(osc.speed(p).mult(1.0/getPeriod(p))); }
+  PVector getRawSpeed(){
+    return new PVector(get("speed"), get("speed")*tan(radians(get("dr"))), 0.0);
+  }
+  
+  PVector getSpeed(PVector point){
+    return getRawSpeed().add(ROBOT.frame.ref.copy().sub(point).cross(new PVector(0,0,radians(get("rotation")))));  // Speed of the point = Speed(CG) + point->cg ^ Rotation
+  }  
+  
+  PVector getSpeed(float p){ return getRawSpeed().add(osc.speed(p).mult(1.0/getPeriod(p))); }
   
   float getRotation(float p){ return radians(get("rotation")); }
   
@@ -195,23 +203,18 @@ class Stand extends Walk {
 
 // TRANSIENT MOVES
 
-class LinearTransient extends Move {
+class WalkTransient extends Walk {
     
   PVector[][][] alltrajectories;
   
   Move move1, move2;
-  Move move;
-  float phase_ = -1.0;
   
-  LinearTransient(Move move1, Move move2){
+  float phase_ = -1.0;  // Transient variable to avoid redundant calls to setParameters()
+  
+  WalkTransient(Move move1, Move move2){
+    super();
     this.move1 = move1;
     this.move2 = move2;
-    try{
-      move = move1.getClass().getDeclaredConstructor(Robot.this.getClass()).newInstance(Robot.this);
-    }catch(Exception e){
-      e.printStackTrace();
-      println(move1.getClass().toString()+" must have a default constructor!");
-    }
   }
   
   String getName(){
@@ -220,7 +223,6 @@ class LinearTransient extends Move {
   
   void update(boolean quick){
     alltrajectories = new PVector[(int) ceil(duration)][][];
-    setParameters(phase0);
     for(float i=0; i<alltrajectories.length; i++)
       alltrajectories[(int)i] = getFeetTrajectories(phase0+i);
   }
@@ -230,55 +232,54 @@ class LinearTransient extends Move {
       phase_ = phase;
       float phase_in = (phase-phase0)/duration;
       for(Parameter p : move1.parameters.values())
-        move.parameters.get(p.name).value = (1.0-phase_in) * p.value + phase_in * move2.get(p.name);
-      move.update(true); // Recompute move's trajectory
+        parameters.get(p.name).value = (1.0-phase_in) * p.value + phase_in * move2.get(p.name);
+      super.update(true); // Recompute move's trajectory
       trajectories = alltrajectories[(int)(phase-phase0)]; //<>//
     }
   }
   
   float getPeriod(float phase){
     setParameters(phase);
-    return move.getPeriod(phase);
+    return super.getPeriod(phase);
   }
   
   PVector getSpeed(float phase){
     setParameters(phase);
-    return move.getSpeed(phase);
+    return super.getSpeed(phase);
   }
   
   float getRotation(float phase){
     setParameters(phase);
-    return move.getRotation(phase);
+    return super.getRotation(phase);
   }
   
   float getHeight(float phase){
     setParameters(phase);
-    return move.getHeight(phase);
+    return super.getHeight(phase);
   }
   
   float getPitch(float phase){
     setParameters(phase);
-    return move.getPitch(phase);
+    return super.getPitch(phase);
   }
   
   float getRoll(float phase){
     setParameters(phase);
-    return move.getRoll(phase);
+    return super.getRoll(phase);
   }
   
   PVector getFootPosition(int i, float phase){
     setParameters(phase);
-    return move.getFootPosition(i, phase);
+    return super.getFootPosition(i, phase);
   }
     
 }
 
 
-class PilotedMove extends LinearTransient {
+class PilotedMove extends WalkTransient {
   
   PilotedMove(){
     super(new Walk(), new Walk());
-    parameters.putAll(move1.parameters);
   }
   
   String getName(){
@@ -291,23 +292,13 @@ class PilotedMove extends LinearTransient {
   
   void set(String name, float value){
     for(Parameter p:parameters.values())
-      move1.parameters.get(p.name).value = move.get(p.name);
+      move1.parameters.get(p.name).value = p.value;
     move2.parameters.get(name).value = value;
     phase0 = TIME.phase;
     update();
   }
 }
 
-
-/*
-class Start extends Transient {
-  
-  Start(double duration){
-    super(duration);
-  }
-  
-}
-*/
 
 class Parameter {
   String name;
