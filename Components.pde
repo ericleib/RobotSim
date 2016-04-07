@@ -81,9 +81,9 @@ class MyRobot extends Drawable {
           Leg leg = legs[k];
           PVector foot = leg.slot.copy();
           if (leg.right) {
-            foot.add(0, leg.shoulderWidth, -frame.height_).add(pt);
+            foot.add(0, leg.shoulderWidth, -frame.ref.z).add(pt);
           } else {
-            foot.add(0, -leg.shoulderWidth, -frame.height_).add(pt);
+            foot.add(0, -leg.shoulderWidth, -frame.ref.z).add(pt);
           }
           leg.foot = foot;
           leg.resolve();
@@ -260,7 +260,7 @@ class Leg extends Drawable {
 
 class Frame extends Drawable {
 
-  float width_ = 43.75, length_ = 127.75, thick = 5.0, height_;
+  float width_ = 43.75, length_ = 127.75, thick = 5.0;
   float mass = 380;
   
   PVector ref;      // Reference point for speed
@@ -268,8 +268,7 @@ class Frame extends Drawable {
   PVector xf, yf, zf;
     
   void setAttitude(float h, float pitch, float roll){
-    height_ = h;
-    ref = new PVector(0.5*length_, 0.5*width_, height_);
+    ref = new PVector(0.5*length_, 0.5*width_, h);
     attitude = new Rotation(EY, pitch).compose(new Rotation(EX, roll));
     xf = attitude.rotate(EX);
     yf = attitude.rotate(EY);
